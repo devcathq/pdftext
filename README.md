@@ -83,6 +83,19 @@ PyMuPDF 1.28.0's wheel bundles a MuPDF development snapshot ("1.29.0"); this rel
 
 The code was first written for a Go service that replaces a Python document pipeline, and moved here to be shared. `nx.c` repeats in C what PyMuPDF 1.28.0 does to read a page (its `extra.i`): the text page flags, the character boxes, the word split and its small corrections for thin fonts and zero-width glyphs. `sort.go` is PyMuPDF's `get_sorted_text`, with Python's arithmetic (float64 over MuPDF's float32, round half to even).
 
+## Thanks
+
+This package is a thin layer over other people's work. Without them it would not exist, and we would not know how a PDF should read.
+
+- **MuPDF**, by Artifex Software and the many developers who sent it fixes and features over the years. MuPDF's own contributors file thanks in particular Simon Bünzli (zeniko) and Krzysztof Kowalczyk of the SumatraPDF project, and Sebastian Rasmussen. Every page here is read by MuPDF.
+- **PyMuPDF**, by Artifex and [its contributors](https://github.com/pymupdf/PyMuPDF/graphs/contributors). `nx.c` and `sort.go` follow its code, and its output is the answer every test checks against.
+- **The libraries inside MuPDF**: brotli, cmark-gfm, FreeType, gumbo-parser, HarfBuzz, jbig2dec, Little CMS, libjpeg (the Independent JPEG Group), MuJS, OpenJPEG and zlib, and their authors.
+- **The fonts and character maps inside MuPDF**: Noto (Google), Source Han Serif (Adobe), Droid Sans Fallback (the Android Open Source Project), Charis SIL (SIL International), the URW base 35 fonts ((URW)++), and Adobe's CMap resources, which are what read Japanese, Chinese and Korean text.
+- **[go-fitz](https://github.com/gen2brain/go-fitz)** by Milan Nikolic, the Go binding to MuPDF we started from. It showed what a Go binding to MuPDF takes, and where the CJK tables matter.
+- **ReportLab**, which makes the test PDFs.
+
+[THIRD_PARTY.md](THIRD_PARTY.md) lists each of them with its licence and copyright; their licence files ship in every release archive (`licenses/`). Portions of this software are copyright © 2026 The FreeType Project (https://freetype.org). All rights reserved. This software is based in part on the work of the Independent JPEG Group.
+
 ## Licence
 
-AGPL-3.0, as MuPDF and PyMuPDF are (`LICENSE`). MuPDF is © Artifex Software, available under the AGPL or a commercial licence from Artifex; a program that links this package links MuPDF and takes on the same terms.
+AGPL-3.0, as MuPDF and PyMuPDF are (`LICENSE`). MuPDF is © Artifex Software, available under the AGPL or a commercial licence from Artifex; a program that links this package links MuPDF and takes on the same terms. The components MuPDF bundles keep their own licences ([THIRD_PARTY.md](THIRD_PARTY.md)).

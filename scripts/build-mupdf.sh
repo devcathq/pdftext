@@ -70,7 +70,36 @@ build "set -e; cd $dir && tar -xzf src.tar.gz && cd mupdf-$VERSION-source && $ma
   mkdir -p $dir/out && cp build/release/libmupdf.a build/release/libmupdf-third.a $dir/out/"
 
 rm -rf "$root/lib/$target"
-mkdir -p "$root/lib/$target"
+mkdir -p "$root/lib/$target/licenses"
 cp "$work"/out/*.a "$root/lib/$target/"
+
+# The licences of everything in these libraries travel with them
+# (THIRD_PARTY.md); a file missing from a new MuPDF release stops the build.
+src="$work/mupdf-$VERSION-source"
+while read -r from to; do
+  cp "$src/$from" "$root/lib/$target/licenses/$to"
+done <<'EOF'
+COPYING MuPDF-COPYING
+CONTRIBUTORS MuPDF-CONTRIBUTORS
+thirdparty/brotli/LICENSE brotli-LICENSE
+thirdparty/cmark-gfm/COPYING cmark-gfm-COPYING
+thirdparty/freetype/LICENSE.TXT freetype-LICENSE.TXT
+thirdparty/freetype/docs/FTL.TXT freetype-FTL.TXT
+thirdparty/gumbo-parser/COPYING gumbo-parser-COPYING
+thirdparty/harfbuzz/COPYING harfbuzz-COPYING
+thirdparty/jbig2dec/LICENSE jbig2dec-LICENSE
+thirdparty/lcms2/LICENSE lcms2-LICENSE
+thirdparty/libjpeg/README libjpeg-README
+thirdparty/mujs/COPYING mujs-COPYING
+thirdparty/openjpeg/LICENSE openjpeg-LICENSE
+thirdparty/zlib/LICENSE zlib-LICENSE
+resources/fonts/noto/COPYING fonts-noto-COPYING
+resources/fonts/han/LICENSE.txt fonts-source-han-serif-LICENSE.txt
+resources/fonts/droid/NOTICE fonts-droid-NOTICE
+resources/fonts/sil/OFL.txt fonts-charis-sil-OFL.txt
+resources/fonts/urw/OFL.txt fonts-urw-OFL.txt
+resources/README cmaps-README
+EOF
+cp "$root/THIRD_PARTY.md" "$root/lib/$target/licenses/"
 cd "$root/lib/$target"
 if command -v sha256sum >/dev/null; then sha256sum ./*.a; else shasum -a 256 ./*.a; fi
