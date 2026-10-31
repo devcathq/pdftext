@@ -37,10 +37,17 @@ else
 fi
 
 # build runs the make in a shell: in Docker for Linux and Windows, here on a Mac.
+# Docker's files belong to root; they are handed back to this user, so the
+# clean-up at exit can remove them.
+owner="$(id -u):$(id -g)"
+in_docker() {
+  MSYS_NO_PATHCONV=1 docker run --rm --platform "$1" -v "$mount:/work" "$IMAGE" \
+    bash -c "( $2 ); s=\$?; chown -R $owner /work 2>/dev/null; exit \$s"
+}
 case "$target" in
   linux_amd64 | linux_arm64)
     platform="linux/${target#linux_}"
-    build() { MSYS_NO_PATHCONV=1 docker run --rm --platform "$platform" -v "$mount:/work" "$IMAGE" bash -c "$1"; }
+    build() { in_docker "$platform" "$1"; }
     make_cmd="make -j\$(nproc) $MAKE_FLAGS XCFLAGS=-fPIC libs"
     dir=/work
     ;;
@@ -48,7 +55,7 @@ case "$target" in
     # MinGW's headers define _M_AMD64, which turns on MuPDF's SSE4.1 code
     # without its compiler flags; ARCH_HAS_SSE=0 keeps the code paths of the
     # Linux build (only image deskewing uses them).
-    build() { MSYS_NO_PATHCONV=1 docker run --rm --platform linux/amd64 -v "$mount:/work" "$IMAGE" bash -c "$1"; }
+    build() { in_docker linux/amd64 "$1"; }
     make_cmd="apt-get update -qq >/dev/null && apt-get install -y -qq gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 >/dev/null && \
       make -j\$(nproc) $MAKE_FLAGS OS=MINGW CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ \
       AR=x86_64-w64-mingw32-ar HAVE_OBJCOPY=no XCFLAGS=-DARCH_HAS_SSE=0 libs"
