@@ -56,10 +56,11 @@ Without cgo, or with `-tags nomupdf`, the package builds without MuPDF and `Open
 
 ### Building MuPDF
 
-MuPDF 1.28.6 from its released source (`mupdf-downloads`, sha256 checked), `make build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no libs`:
+MuPDF 1.28.6 from its released source (`mupdf-downloads`, sha256 checked), `make build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no XCFLAGS=-ffp-contract=off libs`:
 
 - no viewers and no network code;
 - the default fonts and the CJK tables stay in;
+- every platform sets `-ffp-contract=off`: arm64 compilers otherwise fuse multiply-adds, which round differently from x86 and moved pixels of a drawn page (a 400 DPI test page);
 - Linux adds `-fPIC` and builds on Debian 12: a newer glibc's headers turn `strtol` into its C23 variant (`__isoc23_strtol`), which systems older than glibc 2.38 cannot link;
 - Windows is built for the UCRT runtime and sets `ARCH_HAS_SSE=0`. MinGW's headers define `_M_AMD64`, which would turn on MuPDF's SSE4.1 code without its compiler flags; this keeps Linux's code paths (only image deskewing uses them).
 

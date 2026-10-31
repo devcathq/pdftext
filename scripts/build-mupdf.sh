@@ -21,6 +21,10 @@ SHA256=dc85000640a45d90ca9b77b061f6ca67cce0c4d4fbecf8819647baf573eef101
 LINUX_IMAGE=golang:1.27-bookworm
 CROSS_IMAGE=golang:1.27
 MAKE_FLAGS="build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no"
+# No fused multiply-add: arm64 compilers fuse a*b+c by default, which rounds
+# differently from x86 and moves pixels of a drawn page. Baseline x86-64 has
+# no FMA, so this changes nothing there and makes arm64 draw the same.
+FP_FLAGS="-ffp-contract=off"
 
 target="${1:?usage: build-mupdf.sh <goos_goarch>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -52,7 +56,7 @@ case "$target" in
   linux_amd64 | linux_arm64)
     platform="linux/${target#linux_}"
     build() { in_docker "$platform" "$LINUX_IMAGE" "$1"; }
-    make_cmd="make -j\$(nproc) $MAKE_FLAGS XCFLAGS=-fPIC libs"
+    make_cmd="make -j\$(nproc) $MAKE_FLAGS XCFLAGS='-fPIC $FP_FLAGS' libs"
     dir=/work
     ;;
   windows_amd64)
@@ -66,14 +70,14 @@ case "$target" in
     cross=x86_64-w64-mingw32ucrt
     make_cmd="apt-get update -qq >/dev/null && apt-get install -y -qq gcc-mingw-w64-ucrt64 g++-mingw-w64-ucrt64 >/dev/null && \
       make -j\$(nproc) $MAKE_FLAGS OS=MINGW CC=$cross-gcc CXX=$cross-g++ \
-      AR=$cross-ar HAVE_OBJCOPY=no XCFLAGS=-DARCH_HAS_SSE=0 libs"
+      AR=$cross-ar HAVE_OBJCOPY=no XCFLAGS='-DARCH_HAS_SSE=0 $FP_FLAGS' libs"
     dir=/work
     ;;
   darwin_amd64 | darwin_arm64)
     want="${target#darwin_}"; [ "$want" = amd64 ] && want=x86_64
     [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = "$want" ] || { echo "build $target on a Mac of that architecture" >&2; exit 1; }
     build() { bash -c "$1"; }
-    make_cmd="make -j\$(sysctl -n hw.ncpu) $MAKE_FLAGS libs"
+    make_cmd="make -j\$(sysctl -n hw.ncpu) $MAKE_FLAGS XCFLAGS='$FP_FLAGS' libs"
     dir="$work"
     ;;
   *)
