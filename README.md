@@ -38,12 +38,12 @@ The package needs cgo and MuPDF's static libraries for your platform, about 69 M
 - **Download** them from a release: `bash scripts/fetch-libs.sh <goos_goarch> [dir]` checks them against the release's `SHA256SUMS`.
 - **Or build** them from MuPDF's source: `bash scripts/build-mupdf.sh <goos_goarch>` (Docker for Linux and Windows, a Mac for macOS).
 
-Inside this repository they go to `lib/<goos>_<goarch>/` and are found from there. In your own module, point cgo at them: `CGO_ENABLED=1 CGO_LDFLAGS=-L/path/to/libs go build`. On Windows cgo needs MinGW-w64's `gcc`.
+Inside this repository they go to `lib/<goos>_<goarch>/` and are found from there. In your own module, point cgo at them: `CGO_ENABLED=1 CGO_LDFLAGS=-L/path/to/libs go build`. On Windows cgo needs a MinGW-w64 `gcc` for the UCRT runtime, the default of MSYS2's UCRT64 and of MinGW-Builds; a toolchain for the older msvcrt runtime (TDM-GCC, old MinGW) cannot link these libraries, because `setjmp` is a different symbol there.
 
 | Platform | Libraries |
 |---|---|
 | `linux_amd64`, `linux_arm64` | built in Docker (`golang:1.27`, gcc) |
-| `windows_amd64` | cross-built in Docker with MinGW-w64 |
+| `windows_amd64` | cross-built in Docker with MinGW-w64 for UCRT |
 | `darwin_arm64`, `darwin_amd64` | built on a Mac of that architecture |
 
 Without cgo, or with `-tags nomupdf`, the package builds without MuPDF and `Open` returns `ErrUnavailable`, so a program that only sometimes reads PDFs still builds anywhere.
@@ -55,7 +55,7 @@ MuPDF 1.28.6 from its released source (`mupdf-downloads`, sha256 checked), `make
 - no viewers and no network code;
 - the default fonts and the CJK tables stay in;
 - Linux adds `-fPIC`;
-- Windows sets `ARCH_HAS_SSE=0`. MinGW's headers define `_M_AMD64`, which would turn on MuPDF's SSE4.1 code without its compiler flags; this keeps Linux's code paths (only image deskewing uses them).
+- Windows is built for the UCRT runtime and sets `ARCH_HAS_SSE=0`. MinGW's headers define `_M_AMD64`, which would turn on MuPDF's SSE4.1 code without its compiler flags; this keeps Linux's code paths (only image deskewing uses them).
 
 `include/` holds the headers of that release; `Open` refuses to run if the headers and the linked library disagree.
 

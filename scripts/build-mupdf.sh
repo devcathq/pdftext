@@ -4,7 +4,7 @@
 #
 #   bash scripts/build-mupdf.sh linux_amd64     # in Docker (golang image)
 #   bash scripts/build-mupdf.sh linux_arm64     # in Docker (native on an arm64 host, emulated elsewhere)
-#   bash scripts/build-mupdf.sh windows_amd64   # in Docker, cross-compiled with MinGW-w64
+#   bash scripts/build-mupdf.sh windows_amd64   # in Docker, cross-compiled with MinGW-w64 for UCRT
 #   bash scripts/build-mupdf.sh darwin_arm64    # natively, on a Mac of that architecture
 #   bash scripts/build-mupdf.sh darwin_amd64
 #
@@ -52,13 +52,17 @@ case "$target" in
     dir=/work
     ;;
   windows_amd64)
+    # MinGW-w64 for the UCRT runtime, the default of today's Windows
+    # toolchains (MSYS2 UCRT64, MinGW-Builds): setjmp is a different symbol
+    # there than in msvcrt, so the two cannot link each other's libraries.
     # MinGW's headers define _M_AMD64, which turns on MuPDF's SSE4.1 code
     # without its compiler flags; ARCH_HAS_SSE=0 keeps the code paths of the
     # Linux build (only image deskewing uses them).
     build() { in_docker linux/amd64 "$1"; }
-    make_cmd="apt-get update -qq >/dev/null && apt-get install -y -qq gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 >/dev/null && \
-      make -j\$(nproc) $MAKE_FLAGS OS=MINGW CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ \
-      AR=x86_64-w64-mingw32-ar HAVE_OBJCOPY=no XCFLAGS=-DARCH_HAS_SSE=0 libs"
+    cross=x86_64-w64-mingw32ucrt
+    make_cmd="apt-get update -qq >/dev/null && apt-get install -y -qq gcc-mingw-w64-ucrt64 g++-mingw-w64-ucrt64 >/dev/null && \
+      make -j\$(nproc) $MAKE_FLAGS OS=MINGW CC=$cross-gcc CXX=$cross-g++ \
+      AR=$cross-ar HAVE_OBJCOPY=no XCFLAGS=-DARCH_HAS_SSE=0 libs"
     dir=/work
     ;;
   darwin_amd64 | darwin_arm64)
