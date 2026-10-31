@@ -15,7 +15,11 @@ set -euo pipefail
 VERSION=1.28.6
 URL="https://github.com/ArtifexSoftware/mupdf-downloads/releases/download/$VERSION/mupdf-$VERSION-source.tar.gz"
 SHA256=dc85000640a45d90ca9b77b061f6ca67cce0c4d4fbecf8819647baf573eef101
-IMAGE=golang:1.27
+# Linux builds on Debian 12 (glibc 2.36): libraries compiled against a newer
+# glibc call its C23 functions (__isoc23_strtol) and cannot link on older
+# systems. Windows builds on Debian 13, for its MinGW-w64 for UCRT.
+LINUX_IMAGE=golang:1.27-bookworm
+CROSS_IMAGE=golang:1.27
 MAKE_FLAGS="build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no"
 
 target="${1:?usage: build-mupdf.sh <goos_goarch>}"
@@ -41,13 +45,13 @@ fi
 # clean-up at exit can remove them.
 owner="$(id -u):$(id -g)"
 in_docker() {
-  MSYS_NO_PATHCONV=1 docker run --rm --platform "$1" -v "$mount:/work" "$IMAGE" \
-    bash -c "( $2 ); s=\$?; chown -R $owner /work 2>/dev/null; exit \$s"
+  MSYS_NO_PATHCONV=1 docker run --rm --platform "$1" -v "$mount:/work" "$2" \
+    bash -c "( $3 ); s=\$?; chown -R $owner /work 2>/dev/null; exit \$s"
 }
 case "$target" in
   linux_amd64 | linux_arm64)
     platform="linux/${target#linux_}"
-    build() { in_docker "$platform" "$1"; }
+    build() { in_docker "$platform" "$LINUX_IMAGE" "$1"; }
     make_cmd="make -j\$(nproc) $MAKE_FLAGS XCFLAGS=-fPIC libs"
     dir=/work
     ;;
@@ -58,7 +62,7 @@ case "$target" in
     # MinGW's headers define _M_AMD64, which turns on MuPDF's SSE4.1 code
     # without its compiler flags; ARCH_HAS_SSE=0 keeps the code paths of the
     # Linux build (only image deskewing uses them).
-    build() { in_docker linux/amd64 "$1"; }
+    build() { in_docker linux/amd64 "$CROSS_IMAGE" "$1"; }
     cross=x86_64-w64-mingw32ucrt
     make_cmd="apt-get update -qq >/dev/null && apt-get install -y -qq gcc-mingw-w64-ucrt64 g++-mingw-w64-ucrt64 >/dev/null && \
       make -j\$(nproc) $MAKE_FLAGS OS=MINGW CC=$cross-gcc CXX=$cross-g++ \

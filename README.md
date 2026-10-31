@@ -42,7 +42,7 @@ Inside this repository they go to `lib/<goos>_<goarch>/` and are found from ther
 
 | Platform | Libraries |
 |---|---|
-| `linux_amd64`, `linux_arm64` | built in Docker (`golang:1.27`, gcc) |
+| `linux_amd64`, `linux_arm64` | built in Docker on Debian 12 (`golang:1.27-bookworm`, gcc 12), so they link on glibc 2.36 and newer |
 | `windows_amd64` | cross-built in Docker with MinGW-w64 for UCRT |
 | `darwin_arm64`, `darwin_amd64` | built on a Mac of that architecture |
 
@@ -54,7 +54,7 @@ MuPDF 1.28.6 from its released source (`mupdf-downloads`, sha256 checked), `make
 
 - no viewers and no network code;
 - the default fonts and the CJK tables stay in;
-- Linux adds `-fPIC`;
+- Linux adds `-fPIC` and builds on Debian 12: a newer glibc's headers turn `strtol` into its C23 variant (`__isoc23_strtol`), which systems older than glibc 2.38 cannot link;
 - Windows is built for the UCRT runtime and sets `ARCH_HAS_SSE=0`. MinGW's headers define `_M_AMD64`, which would turn on MuPDF's SSE4.1 code without its compiler flags; this keeps Linux's code paths (only image deskewing uses them).
 
 `include/` holds the headers of that release; `Open` refuses to run if the headers and the linked library disagree.
