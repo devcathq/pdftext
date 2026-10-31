@@ -1,0 +1,5 @@
+# MuPDF builds: from the releases or scripts/build-mupdf.sh, never committed (about 70 MB a platform)
+/lib/
+# test binaries
+*.exe
+*.test

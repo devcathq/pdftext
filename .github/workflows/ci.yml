@@ -1,0 +1,93 @@
+name: ci
+
+# Builds MuPDF for every platform (cached until scripts/build-mupdf.sh
+# changes), runs the tests natively on each, and on a v* tag publishes the
+# libraries with their checksums as the release's assets.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  MUPDF: 1.28.6
+
+jobs:
+  libs:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux_amd64, os: ubuntu-24.04 }
+          - { target: linux_arm64, os: ubuntu-24.04-arm }
+          - { target: windows_amd64, os: ubuntu-24.04 } # cross-compiled with MinGW-w64 in Docker
+          - { target: darwin_arm64, os: macos-14 }
+          - { target: darwin_amd64, os: macos-15-intel }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: lib/${{ matrix.target }}
+          key: mupdf-${{ env.MUPDF }}-${{ matrix.target }}-${{ hashFiles('scripts/build-mupdf.sh') }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: bash scripts/build-mupdf.sh ${{ matrix.target }}
+      - run: tar -czf mupdf-$MUPDF-${{ matrix.target }}.tar.gz -C lib/${{ matrix.target }} .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mupdf-${{ matrix.target }}
+          path: mupdf-${{ env.MUPDF }}-${{ matrix.target }}.tar.gz
+
+  test:
+    needs: libs
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux_amd64, os: ubuntu-24.04 }
+          - { target: linux_arm64, os: ubuntu-24.04-arm }
+          - { target: windows_amd64, os: windows-2025 }
+          - { target: darwin_arm64, os: macos-14 }
+          - { target: darwin_amd64, os: macos-15-intel }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          name: mupdf-${{ matrix.target }}
+      - run: mkdir -p lib/${{ matrix.target }} && tar -xzf mupdf-$MUPDF-${{ matrix.target }}.tar.gz -C lib/${{ matrix.target }}
+      - run: gcc --version | head -1 # cgo's C compiler (MinGW-w64 on Windows)
+      - run: go vet ./... && go test -count=1 -v ./...
+        env:
+          CGO_ENABLED: "1"
+      - run: go test -count=1 -tags nomupdf ./... # the build without MuPDF
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mupdf-*
+          merge-multiple: true
+      - run: sha256sum mupdf-*.tar.gz > SHA256SUMS && cat SHA256SUMS
+      - run: >
+          gh release create "$GITHUB_REF_NAME" mupdf-*.tar.gz SHA256SUMS
+          --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME"
+          --notes "MuPDF $MUPDF static libraries with the CJK tables, one archive per platform. Checksums in SHA256SUMS; scripts/fetch-libs.sh downloads and checks them."
+        env:
+          GH_TOKEN: ${{ github.token }}
