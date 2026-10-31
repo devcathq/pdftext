@@ -7,7 +7,10 @@ Usage: python scripts/make_testdata.py testdata
 - rotated.pdf: the same text on a page rotated by 90 degrees;
 - cjk.pdf: Japanese, Korean and Chinese pages in the PDF standard CJK fonts
   (no embedded font, no Unicode map), which only MuPDF's CJK tables read;
-- many_pages.pdf: seven pages of a short invoice-like layout.
+- many_pages.pdf: seven pages of a short invoice-like layout;
+- images.pdf: a page covered by a scanned-looking image, a page with a logo,
+  a note annotation and an image partly off the page, a rotated page with an
+  image, and a blank page (for Render, ImageBoxes and Bounds).
 """
 import os
 import sys
@@ -15,7 +18,9 @@ import sys
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+from PIL import Image, ImageDraw
 
 for name in ("HeiseiKakuGo-W5", "HYSMyeongJo-Medium", "STSong-Light"):
     pdfmetrics.registerFont(UnicodeCIDFont(name))
@@ -68,9 +73,41 @@ def many_pages(c):
         c.showPage()
 
 
+def picture(w, h, mode, lines):
+    """A made-up image: a frame, stripes and a few lines of text."""
+    img = Image.new(mode, (w, h), "white")
+    d = ImageDraw.Draw(img)
+    d.rectangle([4, 4, w - 5, h - 5], outline="black", width=3)
+    for y in range(40, h - 40, 60):
+        d.line([20, y, w - 20, y], fill="gray", width=1)
+    for i, t in enumerate(lines):
+        d.text((30, 30 + 28 * i), t, fill="black")
+    return ImageReader(img)
+
+
+def images(c):
+    w, h = A4
+    c.drawImage(picture(620, 877, "L", ["SCANNED RECEIPT", "No. 0042", "Total 3,300"]), 0, 0, w, h)
+    c.showPage()
+    c.drawImage(picture(240, 120, "RGB", ["LOGO"]), 60, h - 140, 120, 60)
+    c.drawImage(picture(200, 200, "RGB", ["half off the page"]), w - 100, 300, 200, 200)
+    c.setFont("Helvetica", 11)
+    c.drawString(60, h - 180, "A page with a logo and an image half off the page.")
+    c.textAnnotation("A note", Rect=(400, h - 120, 420, h - 100), relative=0)
+    c.showPage()
+    c.setPageRotation(90)
+    c.drawImage(picture(300, 200, "RGB", ["ROTATED", "PAGE"]), 100, 400, 300, 200)
+    c.setFont("Helvetica", 11)
+    c.drawString(100, 380, "Text under the image on a rotated page.")
+    c.showPage()
+    c.setPageRotation(0)
+    c.showPage()
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
-    for name, fill in [("columns", columns), ("rotated", rotated), ("cjk", cjk), ("many_pages", many_pages)]:
+    for name, fill in [("columns", columns), ("rotated", rotated), ("cjk", cjk), ("many_pages", many_pages),
+                       ("images", images)]:
         c = canvas.Canvas(os.path.join(out, name + ".pdf"), pagesize=A4, invariant=1)
         fill(c)
         c.save()

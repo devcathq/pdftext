@@ -83,3 +83,47 @@ func (d *Doc) Page(n int) (Page, error) {
 		HasImage: out.has_image != 0,
 	}, nil
 }
+
+// Bounds is page n's page.rect: its box with the page's rotation applied.
+func (d *Doc) Bounds(n int) (Rect, error) {
+	var r C.nx_rect
+	if C.nx_bound(d.ctx, d.doc, C.int(n), &r) != 0 {
+		return Rect{}, fmt.Errorf("pdftext: page %d could not be read", n+1)
+	}
+	return Rect{float32(r.x0), float32(r.y0), float32(r.x1), float32(r.y1)}, nil
+}
+
+// Render draws page n as page.get_pixmap(dpi=dpi).tobytes("png") does: RGB,
+// no alpha, on white, annotations included, the page's rotation applied,
+// at dpi/72 pixels per point, with dpi as the PNG's resolution.
+func (d *Doc) Render(n, dpi int) (Picture, error) {
+	if dpi <= 0 {
+		return Picture{}, fmt.Errorf("pdftext: dpi %d", dpi)
+	}
+	var out C.nx_picture
+	C.nx_render(d.ctx, d.doc, C.int(n), C.int(dpi), &out)
+	defer C.nx_free_picture(d.ctx, &out)
+	if out.failed != 0 {
+		return Picture{}, fmt.Errorf("pdftext: page %d could not be drawn", n+1)
+	}
+	return Picture{
+		PNG:   C.GoBytes(unsafe.Pointer(out.png), C.int(out.npng)),
+		Width: int(out.w), Height: int(out.h), White: out.white != 0,
+	}, nil
+}
+
+// ImageBoxes is the bbox of each image page n draws, as page.get_image_info()
+// lists them: in drawing order, read with the page derotated.
+func (d *Doc) ImageBoxes(n int) ([]Rect, error) {
+	var out C.nx_boxes
+	C.nx_image_boxes(d.ctx, d.doc, C.int(n), &out)
+	defer C.nx_free_boxes(&out)
+	if out.failed != 0 {
+		return nil, fmt.Errorf("pdftext: page %d could not be read", n+1)
+	}
+	boxes := make([]Rect, 0, int(out.n))
+	for _, b := range unsafe.Slice(out.boxes, int(out.n)) {
+		boxes = append(boxes, Rect{float32(b.x0), float32(b.y0), float32(b.x1), float32(b.y1)})
+	}
+	return boxes, nil
+}

@@ -17,3 +17,12 @@ func (*Doc) Close() {}
 
 // Page returns ErrUnavailable in this build.
 func (*Doc) Page(int) (Page, error) { return Page{}, ErrUnavailable }
+
+// Bounds returns ErrUnavailable in this build.
+func (*Doc) Bounds(int) (Rect, error) { return Rect{}, ErrUnavailable }
+
+// Render returns ErrUnavailable in this build.
+func (*Doc) Render(int, int) (Picture, error) { return Picture{}, ErrUnavailable }
+
+// ImageBoxes returns ErrUnavailable in this build.
+func (*Doc) ImageBoxes(int) ([]Rect, error) { return nil, ErrUnavailable }

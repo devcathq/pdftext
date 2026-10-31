@@ -1,8 +1,8 @@
 # pdftext
 
-PDF text for Go, exactly as Python's PyMuPDF gives it.
+PDF text and page images for Go, exactly as Python's PyMuPDF gives them.
 
-When a Python service that reads PDFs with PyMuPDF moves to Go, the text must not change: classifiers, prompts, field extraction and stored rows all depend on it, byte for byte. `pdftext` reads PDFs with the same C library, MuPDF, and repeats what PyMuPDF does on top of it. A page gives the same plain text, the same text in reading order (`get_text("text", sort=True)`), the same words and the same image flag.
+When a Python service that reads PDFs with PyMuPDF moves to Go, the text must not change: classifiers, prompts, field extraction and stored rows all depend on it, byte for byte. Nor may the page images it sends to an OCR model. `pdftext` reads PDFs with the same C library, MuPDF, and repeats what PyMuPDF does on top of it. A page gives the same plain text, the same text in reading order (`get_text("text", sort=True)`), the same words, the same image flag, the same size and image boxes, and the same picture (`get_pixmap(dpi=…)`), pixel for pixel.
 
 It ships MuPDF **with its CJK tables**, which Japanese, Chinese and Korean PDFs need when their fonts carry no Unicode map. Other Go bindings leave them out to save space, and then those PDFs read differently or not at all.
 
@@ -26,6 +26,12 @@ for i := 0; i < doc.Pages(); i++ {
 	_ = page.Words               // page.get_text("words"): text and box
 	_ = page.HasImage            // len(page.get_images()) > 0
 	_, _ = sorted, err
+
+	box, _ := doc.Bounds(i)        // page.rect
+	images, _ := doc.ImageBoxes(i) // [info["bbox"] for info in page.get_image_info()]
+	pic, _ := doc.Render(i, 400)   // page.get_pixmap(dpi=400).tobytes("png")
+	_ = pic.White                  // every pixel is white: the page draws nothing
+	_, _ = box, images
 }
 ```
 
@@ -61,15 +67,16 @@ MuPDF 1.28.6 from its released source (`mupdf-downloads`, sha256 checked), `make
 
 ## Checked against PyMuPDF
 
-`TestAgainstPyMuPDF` reads every PDF of a folder and requires, page by page, PyMuPDF's plain text, sorted text, words and image flag (`pymupdf.jsonl`, written by `scripts/pymupdf_golden.py` with PyMuPDF 1.28.0).
+`TestAgainstPyMuPDF` reads every PDF of a folder and requires, page by page, PyMuPDF's plain text, sorted text, words, image flag, page box and image boxes, and, where they were recorded, the page drawn at each DPI: its size, its pixels and its PNG bytes (`pymupdf.jsonl`, written by `scripts/pymupdf_golden.py` with PyMuPDF 1.28.0).
 
-- **`testdata/`:** the PDFs `scripts/make_testdata.py` makes: two-column and scattered layouts, a rotated page, Japanese, Korean and Chinese pages in the standard CJK fonts, and a seven-page statement. CI runs it on every platform.
-- **Your own PDFs:** `python scripts/pymupdf_golden.py <folder>`, then `PDFTEXT_CORPUS=<folder> go test -run TestAgainstPyMuPDF`.
+- **`testdata/`:** the PDFs `scripts/make_testdata.py` makes: two-column and scattered layouts, a rotated page, Japanese, Korean and Chinese pages in the standard CJK fonts, a seven-page statement, and pages with images (a full-page scan, a logo, an image half off the page, a note annotation, a rotated page, a blank page), drawn at 150 and 400 DPI. CI runs it on every platform.
+- **Your own PDFs:** `python scripts/pymupdf_golden.py <folder> [dpi,…]`, then `PDFTEXT_CORPUS=<folder> go test -run TestAgainstPyMuPDF`.
 - **Measured 31 Oct 2026** on 300 real business PDFs (Japanese, Korean and English invoices, contracts, statements; not published):
   - `linux_amd64`: 300 of 300 files, 3,659 of 3,659 pages the same as PyMuPDF.
   - `windows_amd64` (cross-built, run natively on Windows 11): 300 of 300 files, 3,659 of 3,659 pages.
+  - Drawn at 100 DPI (v0.2.0, `linux_amd64`): 3,659 of 3,659 pages the same pixels and the same PNG bytes, and the same page and image boxes.
 
-PyMuPDF 1.28.0's wheel bundles a MuPDF development snapshot ("1.29.0"); this release build gives the same text on all of those files. go-fitz's prebuilt MuPDF, which leaves the CJK tables out, gave 298 of 300 (30 Oct 2026).
+PyMuPDF 1.28.0's wheel bundles a MuPDF development snapshot ("1.29.0"); this release build gives the same text and pictures on all of those files. One difference is known: where a PDF's CJK font is not embedded, MuPDF draws the text with a font of its own, and the snapshot picks a sans-serif one where 1.28.6 picks Source Han Serif (the test's `cjk.pdf`; none of the 300 files). go-fitz's prebuilt MuPDF, which leaves the CJK tables out, gave 298 of 300 (30 Oct 2026).
 
 ## Status
 
@@ -83,7 +90,7 @@ PyMuPDF 1.28.0's wheel bundles a MuPDF development snapshot ("1.29.0"); this rel
 
 ## Where it comes from
 
-The code was first written for a Go service that replaces a Python document pipeline, and moved here to be shared. `nx.c` repeats in C what PyMuPDF 1.28.0 does to read a page (its `extra.i`): the text page flags, the character boxes, the word split and its small corrections for thin fonts and zero-width glyphs. `sort.go` is PyMuPDF's `get_sorted_text`, with Python's arithmetic (float64 over MuPDF's float32, round half to even).
+The code was first written for a Go service that replaces a Python document pipeline, and moved here to be shared. `nx.c` repeats in C what PyMuPDF 1.28.0 does to read a page (its `extra.i`): the text page flags, the character boxes, the word split and its small corrections for thin fonts and zero-width glyphs. `sort.go` is PyMuPDF's `get_sorted_text`, with Python's arithmetic (float64 over MuPDF's float32, round half to even). `nx_draw.c` is what PyMuPDF does to draw a page (`get_pixmap`, its display list and PNG writer) and to list the images a page draws (`get_image_info`).
 
 ## Thanks
 

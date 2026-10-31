@@ -1,8 +1,10 @@
-// Package pdftext reads the text of PDF pages through MuPDF exactly as
-// PyMuPDF 1.28 gives it: a page's words with their boxes, its plain text
+// Package pdftext reads PDF pages through MuPDF exactly as PyMuPDF 1.28
+// gives them: a page's words with their boxes, its plain text
 // (page.get_text()), its text in reading order (page.get_text("text",
-// sort=True)), and whether it shows an image (page.get_images()). A Go
-// service that replaces a Python one gets the same text, byte for byte.
+// sort=True)), whether it shows an image (page.get_images()), its size
+// (page.rect), the boxes of the images it draws (page.get_image_info()), and
+// the page drawn as PNG (page.get_pixmap(dpi=…).tobytes("png")). A Go
+// service that replaces a Python one gets the same text and the same pixels.
 //
 // MuPDF is a C library, linked through cgo. Its static build for each
 // platform, with the CJK tables Japanese, Chinese and Korean PDFs need, comes
@@ -35,3 +37,14 @@ type Page struct {
 
 // Sorted is the page's get_text("text", sort=True) (SortedText).
 func (p Page) Sorted() (string, error) { return SortedText(p.Words) }
+
+// Rect is a box in points, in MuPDF's float32: x0, y0 top left, x1, y1
+// bottom right.
+type Rect struct{ X0, Y0, X1, Y1 float32 }
+
+// Picture is a page drawn as PNG.
+type Picture struct {
+	PNG           []byte
+	Width, Height int  // in pixels
+	White         bool // every pixel is white: the page draws nothing
+}

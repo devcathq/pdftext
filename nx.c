@@ -210,12 +210,6 @@ static int has_image(fz_context *ctx, pdf_document *pdf, int pno) {
 	return found > 0;
 }
 
-static int norm_rotation(int r) {
-	while (r < 0) r += 360;
-	while (r >= 360) r -= 360;
-	return r % 90 ? 0 : r;
-}
-
 static void silent(void *user, const char *message) {}
 
 fz_context *nx_new_context(void) {
@@ -262,7 +256,7 @@ void nx_read_page(fz_context *ctx, fz_document *doc, int pno, nx_page *out) {
 		page = fz_load_page(ctx, doc, pno);
 		if (pdf) {
 			pobj = pdf_lookup_page_obj(ctx, pdf, pno);
-			old = norm_rotation(pdf_to_int(ctx, pdf_dict_get_inheritable(ctx, pobj, PDF_NAME(Rotate))));
+			old = nx_norm_rotation(pdf_to_int(ctx, pdf_dict_get_inheritable(ctx, pobj, PDF_NAME(Rotate))));
 			if (old) pdf_dict_put_int(ctx, pobj, PDF_NAME(Rotate), 0);
 		}
 		fz_stext_options opts;

@@ -102,3 +102,52 @@ func TestBadPage(t *testing.T) {
 		t.Fatal("want an error for a page past the end")
 	}
 }
+
+func TestRender(t *testing.T) {
+	doc, err := Open(testPDF([]string{"Hello", ""}, []string{"", "/Rotate 90"}, []bool{false, false}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+	text, err := doc.Render(0, 72)
+	if err != nil || text.Width != 612 || text.Height != 792 || text.White {
+		t.Fatalf("page 1: %dx%d white %v, err %v", text.Width, text.Height, text.White, err)
+	}
+	if !bytes.HasPrefix(text.PNG, []byte("\x89PNG\r\n\x1a\n")) {
+		t.Fatal("page 1 is not a PNG")
+	}
+	// A page that draws nothing is white, and its rotation turns it.
+	blank, err := doc.Render(1, 144)
+	if err != nil || blank.Width != 1584 || blank.Height != 1224 || !blank.White {
+		t.Fatalf("page 2: %dx%d white %v, err %v", blank.Width, blank.Height, blank.White, err)
+	}
+	if _, err := doc.Render(0, 0); err == nil {
+		t.Fatal("want an error for dpi 0")
+	}
+	if _, err := doc.Render(9, 72); err == nil {
+		t.Fatal("want an error for a page past the end")
+	}
+}
+
+func TestBoundsAndImageBoxes(t *testing.T) {
+	doc, err := Open(testPDF([]string{"x", "y"}, []string{"/Rotate 90", ""}, []bool{false, true}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer doc.Close()
+	if r, err := doc.Bounds(0); err != nil || r != (Rect{0, 0, 792, 612}) {
+		t.Fatalf("rotated bounds %+v, err %v", r, err)
+	}
+	// Page 2 lists an image in its resources but never draws it: get_images
+	// sees it, get_image_info does not.
+	p, err := doc.Page(1)
+	if err != nil || !p.HasImage {
+		t.Fatalf("page 2: image %v, err %v", p.HasImage, err)
+	}
+	if boxes, err := doc.ImageBoxes(1); err != nil || len(boxes) != 0 {
+		t.Fatalf("page 2 boxes %+v, err %v", boxes, err)
+	}
+	if _, err := doc.Bounds(5); err == nil {
+		t.Fatal("want an error for a page past the end")
+	}
+}
