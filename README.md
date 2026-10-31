@@ -83,11 +83,11 @@ PyMuPDF 1.28.0's wheel bundles a MuPDF development snapshot ("1.29.0"); this rel
 
 | Platform | Built by CI | Tests (native, CI) | `testdata/` against PyMuPDF | 300 real PDFs against PyMuPDF |
 |---|---|---|---|---|
-| `linux_amd64` | yes | pass | 13 of 13 pages | 300 of 300 files (local) |
-| `windows_amd64` | yes (UCRT) | pass | 13 of 13 pages | 300 of 300 files (Windows 11) |
-| `linux_arm64` | yes | pass | 13 of 13 pages | not run |
-| `darwin_arm64` | yes | pass | 13 of 13 pages | not run |
-| `darwin_amd64` | yes | pass | 13 of 13 pages | not run |
+| `linux_amd64` | yes | pass | 17 of 17 pages, drawings included | 300 of 300 files, drawings at 100 DPI included (local) |
+| `windows_amd64` | yes (UCRT) | pass | 17 of 17 pages, drawings included | 300 of 300 files, text (Windows 11) |
+| `linux_arm64` | yes | pass | 17 of 17 pages, drawings included | not run |
+| `darwin_arm64` | yes | pass | 17 of 17 pages, drawings included | not run |
+| `darwin_amd64` | yes | pass | 17 of 17 pages, drawings included | not run |
 
 ## Where it comes from
 
