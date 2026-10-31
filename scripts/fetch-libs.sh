@@ -8,7 +8,7 @@
 # PDFTEXT_RELEASE picks the release (default below).
 set -euo pipefail
 
-RELEASE="${PDFTEXT_RELEASE:-v0.1.0}"
+RELEASE="${PDFTEXT_RELEASE:-v0.1.1}"
 MUPDF=1.28.6
 BASE="https://github.com/devcathq/pdftext/releases/download/$RELEASE"
 
