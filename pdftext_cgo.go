@@ -234,3 +234,15 @@ func (d *Doc) FindTables(n int) ([]Table, error) {
 	}
 	return findTables(in, n), nil
 }
+
+// ResolveNames is doc.resolve_names(): the named destinations of the
+// catalog's /Dests and its /Names/Dests tree, by name.
+func (d *Doc) ResolveNames() (map[string]Dest, error) {
+	var in destInput
+	var out C.nx_json
+	C.nx_dest_names(d.ctx, d.doc, &out)
+	if err := d.decode(&out, "resolve_names", &in); err != nil {
+		return nil, err
+	}
+	return resolveNames(in)
+}

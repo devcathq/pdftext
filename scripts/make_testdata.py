@@ -21,7 +21,11 @@ Usage: python scripts/make_testdata.py testdata
   table finder);
 - image_kinds.pdf: an RGB image with an alpha mask, a CMYK JPEG, a grey
   image, a logo placed twice and an image inside a Form XObject (for
-  Images, Image and ImageRects).
+  Images, Image and ImageRects);
+- dests.pdf: three pages with named destinations of several kinds (/XYZ
+  with and without zoom, /Fit, /FitH, by page object and by page number) in a
+  /Names/Dests tree and an old-style /Dests dict, as a contents page links
+  to them (for ResolveNames; the names are added with PyMuPDF).
 """
 import os
 import sys
@@ -275,14 +279,38 @@ def image_kinds(c):
     c.showPage()
 
 
+def dests(c):
+    c.setFont("Helvetica", 12)
+    for title in ("Contents", "Part 1", "Notes"):
+        c.drawString(60, 780, title)
+        c.showPage()
+
+
+def add_names(path):
+    """Name destinations in dests.pdf, as Chromium names an element's id."""
+    import fitz
+
+    doc = fitz.open(path)
+    p = [doc.page_xref(i) for i in range(doc.page_count)]
+    tree = doc.get_new_xref()
+    doc.update_object(tree, f"<< /Names [ (part-1) [{p[1]} 0 R /FitH 700] (part-cover) [{p[0]} 0 R /Fit]"
+                            f" (part-notes) << /D [{p[2]} 0 R /XYZ 50 600 1.5] >> (part-top) [{p[1]} 0 R /XYZ null 800 null]"
+                            " (no-page) [/XYZ 0 0 0] ] >>")
+    doc.xref_set_key(doc.pdf_catalog(), "Names", f"<< /Dests {tree} 0 R >>")
+    doc.xref_set_key(doc.pdf_catalog(), "Dests", f"<< /old-style [{p[2]} 0 R /XYZ 72 720 0] /by-number [1 /Fit] >>")
+    doc.saveIncr()
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     for name, fill in [("columns", columns), ("rotated", rotated), ("cjk", cjk), ("many_pages", many_pages),
                        ("images", images), ("drawings", drawings), ("tables", tables),
-                       ("image_kinds", image_kinds)]:
+                       ("image_kinds", image_kinds), ("dests", dests)]:
         c = canvas.Canvas(os.path.join(out, name + ".pdf"), pagesize=A4, invariant=1)
         fill(c)
         c.save()
+        if name == "dests":
+            add_names(os.path.join(out, name + ".pdf"))
 
 
 if __name__ == "__main__":

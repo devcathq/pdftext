@@ -50,6 +50,7 @@ A `Doc` is not safe for concurrent use: open one per goroutine. `SortedText(word
 | `Images(n)`, `Image(xref, rgb)`, `ImageRects(n, xref)` | `get_images(full=True)`, `Pixmap(doc, xref)` (and `Pixmap(csRGB, pix)`) with `tobytes("png")`, `get_image_rects(xref)` |
 | `XrefLength()`, `XrefObject(xref)` | `xref_length()`, `xref_object(xref)` |
 | `Metadata()`, `SetMetadata(m)` | `doc.metadata`, `set_metadata(m)` |
+| `ResolveNames()` | `resolve_names()` |
 | `New()`, `NewPage(w, h)`, `DrawLine`, `DrawRect`, `InsertText`, `InsertTextbox`, `Bytes()` | `fitz.open()`, `new_page`, `draw_line`, `draw_rect`, `insert_text`, `insert_textbox` (Base-14 and CJK fonts), `tobytes()` |
 | `TextLength(font, text, size)` | `Font(font).text_length(text, fontsize=size)` |
 | `NewPDFWriter()`, `BeginPage`, `EndPage`, `Close`; `NewStory(html, css)`, `Place`, `Draw` | `DocumentWriter`, `Story(html, user_css)`, `place`, `draw` |
@@ -89,11 +90,11 @@ MuPDF 1.28.6 from its released source (`mupdf-downloads`, sha256 checked), `make
 
 ## Checked against PyMuPDF
 
-`TestAgainstPyMuPDF` reads every PDF of a folder and requires, page by page, PyMuPDF's plain text, sorted text, words, image flag, page box and image boxes, blocks, rawdict, drawings (plain and extended), images (their list, pixels, PNG bytes and boxes) and tables (boxes, cells, rows and text), every xref object of the file, and, where they were recorded, the page drawn at each DPI: its size, its pixels and its PNG bytes (`pymupdf.jsonl`, written by `scripts/pymupdf_golden.py` with PyMuPDF 1.28.0).
+`TestAgainstPyMuPDF` reads every PDF of a folder and requires, page by page, PyMuPDF's plain text, sorted text, words, image flag, page box and image boxes, blocks, rawdict, drawings (plain and extended), images (their list, pixels, PNG bytes and boxes) and tables (boxes, cells, rows and text), every xref object and named destination of the file, and, where they were recorded, the page drawn at each DPI: its size, its pixels and its PNG bytes (`pymupdf.jsonl`, written by `scripts/pymupdf_golden.py` with PyMuPDF 1.28.0).
 
 `TestWritingAgainstPyMuPDF` runs the operations of `testdata/write_cases.json` (shapes and text on new pages, a Story through a DocumentWriter, metadata, a page split, text lengths) and requires what PyMuPDF returned for each and, for the PDF made, every page's text and pixels (`pymupdf_write.jsonl`, by `scripts/pymupdf_write_golden.py`). The PDF bytes may differ; what they show may not.
 
-- **`testdata/`:** the PDFs `scripts/make_testdata.py` makes: two-column and scattered layouts, a rotated page, Japanese, Korean and Chinese pages in the standard CJK fonts, a seven-page statement, and pages with images (a full-page scan, a logo, an image half off the page, a note annotation, a rotated page, a blank page), drawn at 150 and 400 DPI; vector drawings (rules, boxes, curves, quads, colours, a clip, a blend group, a rotated page); ruled tables (a header row, an empty cell, a merged cell, a two-line cell, a table on a rotated page); and images of several kinds (an alpha mask, a CMYK JPEG, grey, a logo placed twice, an image inside a Form XObject). CI runs it on every platform.
+- **`testdata/`:** the PDFs `scripts/make_testdata.py` makes: two-column and scattered layouts, a rotated page, Japanese, Korean and Chinese pages in the standard CJK fonts, a seven-page statement, and pages with images (a full-page scan, a logo, an image half off the page, a note annotation, a rotated page, a blank page), drawn at 150 and 400 DPI; vector drawings (rules, boxes, curves, quads, colours, a clip, a blend group, a rotated page); ruled tables (a header row, an empty cell, a merged cell, a two-line cell, a table on a rotated page); images of several kinds (an alpha mask, a CMYK JPEG, grey, a logo placed twice, an image inside a Form XObject); and named destinations of several kinds. CI runs it on every platform.
 - **Your own PDFs:** `python scripts/pymupdf_golden.py <folder> [dpi,…]`, then `PDFTEXT_CORPUS=<folder> go test -run TestAgainstPyMuPDF`.
 - **Measured 31 Oct 2026** on 300 real business PDFs (Japanese, Korean and English invoices, contracts, statements; not published):
   - `linux_amd64`: 300 of 300 files, 3,659 of 3,659 pages the same as PyMuPDF.

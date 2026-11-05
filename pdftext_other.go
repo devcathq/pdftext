@@ -120,3 +120,6 @@ func (*Story) Draw() error { return ErrUnavailable }
 
 // Close does nothing.
 func (*Story) Close() {}
+
+// ResolveNames returns ErrUnavailable in this build.
+func (*Doc) ResolveNames() (map[string]Dest, error) { return nil, ErrUnavailable }

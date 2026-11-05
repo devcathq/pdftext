@@ -20,7 +20,8 @@ components, alpha, colourspace, digest, and the SHA-256 of tobytes("png") or
 the error it raises), and where the page draws each (get_image_rects); and
 last, as it changes a rotated page, its tables (find_tables(): each table's
 bbox, row and column counts, cells, rows and extract()). Per file, the xref
-table before any page is read: xref_length() and every xref_object().
+table before any page is read: xref_length() and every xref_object(); and
+its named destinations (resolve_names()).
 """
 import glob
 import hashlib
@@ -125,6 +126,7 @@ def main(folder, dpis):
                 doc = fitz.open(path)
                 rec["xref_length"] = doc.xref_length()
                 rec["xref_objects"] = [xref_object(doc, x) for x in range(1, doc.xref_length())]
+                rec["names"] = plain(doc.resolve_names())
                 rec["pages"] = [page_record(p, dpis) for p in doc]
             except Exception as e:  # noqa: BLE001 - recorded, the Go side must fail too
                 rec["error"] = f"{type(e).__name__}: {e}"
