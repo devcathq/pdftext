@@ -41,6 +41,7 @@ type golden struct {
 		ImageRects [][]any     `json:"image_rects"`
 		Tables     any         `json:"tables"`
 	} `json:"pages"`
+	Names       any       `json:"names"`
 	XrefLength  int       `json:"xref_length"`
 	XrefObjects []*string `json:"xref_objects"`
 }
@@ -104,6 +105,7 @@ func comparePDF(t *testing.T, path string, g golden) int {
 		return 0
 	}
 	sameXrefs(t, doc, g)
+	sameNames(t, doc, g)
 	same := 0
 	for i, want := range g.Pages {
 		p, err := doc.Page(i)
@@ -438,4 +440,27 @@ func sameTables(t *testing.T, doc *Doc, file string, n int, want any) bool {
 		return false
 	}
 	return true
+}
+
+// sameNames compares resolve_names(); a golden without names passes.
+func sameNames(t *testing.T, doc *Doc, g golden) {
+	if g.Names == nil {
+		return
+	}
+	names, err := doc.ResolveNames()
+	if err != nil {
+		t.Errorf("%s: resolve_names: %v", g.File, err)
+		return
+	}
+	shape := map[string]any{}
+	for k, d := range names {
+		if d.XYZ {
+			shape[k] = map[string]any{"page": d.Page, "to": []any{d.X, d.Y}, "zoom": d.Zoom}
+		} else {
+			shape[k] = map[string]any{"page": d.Page, "dest": d.Dest}
+		}
+	}
+	if ok, diff := sameShape(shape, g.Names); !ok {
+		t.Errorf("%s: resolve_names differ at %s", g.File, diff)
+	}
 }

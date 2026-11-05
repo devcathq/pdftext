@@ -287,3 +287,80 @@ void nx_xref_object(fz_context *ctx, fz_document *doc, int xref, nx_json *out) {
 	}
 	fz_catch(ctx) { nx_json_fail(ctx, b, out); }
 }
+
+// put_dests writes each name of a /Dests dict as [name, printed], printed
+// being obj_string of resolve_names: the destination array, or a dict's
+// /D, printed tight; null where it is neither.
+static void put_dests(fz_context *ctx, fz_buffer *b, int *first, pdf_obj *dict, text *t) {
+	int n = pdf_dict_len(ctx, dict);
+	for (int i = 0; i < n; i++) {
+		pdf_obj *key = pdf_dict_get_key(ctx, dict, i), *val = pdf_dict_get_val(ctx, dict, i);
+		if (!pdf_is_name(ctx, key)) continue;
+		val = pdf_resolve_indirect(ctx, val);
+		pdf_obj *what = pdf_is_array(ctx, val) ? val : pdf_is_dict(ctx, val) ? pdf_dict_gets(ctx, val, "D") : NULL;
+		int some = pdf_is_array(ctx, val) || pdf_is_dict(ctx, val);
+		const char *name = pdf_to_name(ctx, key);
+		nx_j_raw(ctx, b, *first ? "[" : ",[");
+		*first = 0;
+		t->n = 0;
+		nx_put_raw_escape(&t->s, &t->n, &t->cap, name, strlen(name));
+		nx_j_str(ctx, b, t->s ? t->s : "", t->n);
+		nx_j_raw(ctx, b, ",");
+		if (!some) {
+			nx_j_raw(ctx, b, "null]");
+			continue;
+		}
+		fz_buffer *pb = fz_new_buffer(ctx, 256);
+		fz_output *o = NULL;
+		fz_var(o);
+		fz_try(ctx) {
+			o = fz_new_output_with_buffer(ctx, pb);
+			pdf_print_obj(ctx, o, what, 1, 0);
+			fz_close_output(ctx, o);
+			unsigned char *data;
+			size_t len = fz_buffer_storage(ctx, pb, &data);
+			nx_j_bytes(ctx, b, data, len);
+		}
+		fz_always(ctx) {
+			fz_drop_output(ctx, o);
+			fz_drop_buffer(ctx, pb);
+		}
+		fz_catch(ctx) { fz_rethrow(ctx); }
+		nx_j_raw(ctx, b, "]");
+	}
+}
+
+// nx_dest_names writes what resolve_names reads: each page's xref, then
+// the names of the catalog's /Dests and of the /Names/Dests tree, in that
+// order (a later one replaces an earlier one of the same name).
+void nx_dest_names(fz_context *ctx, fz_document *doc, nx_json *out) {
+	fz_buffer *b = NULL;
+	pdf_obj *tree = NULL;
+	text t = {0};
+	fz_var(b); fz_var(tree);
+	fz_try(ctx) {
+		pdf_document *pdf = pdf_specifics(ctx, doc);
+		if (!pdf) fz_throw(ctx, FZ_ERROR_ARGUMENT, "not a PDF");
+		b = fz_new_buffer(ctx, 1024);
+		nx_j_raw(ctx, b, "{\"pages\":[");
+		int n = pdf_count_pages(ctx, pdf);
+		for (int i = 0; i < n; i++) {
+			if (i) nx_j_raw(ctx, b, ",");
+			nx_j_int(ctx, b, pdf_to_num(ctx, pdf_lookup_page_obj(ctx, pdf, i)));
+		}
+		nx_j_raw(ctx, b, "],\"names\":[");
+		int first = 1;
+		pdf_obj *catalog = pdf_dict_gets(ctx, pdf_trailer(ctx, pdf), "Root");
+		pdf_obj *old = pdf_dict_get(ctx, catalog, PDF_NAME(Dests));
+		if (pdf_is_dict(ctx, old)) put_dests(ctx, b, &first, old, &t);
+		tree = pdf_load_name_tree(ctx, pdf, PDF_NAME(Dests));
+		if (pdf_is_dict(ctx, tree)) put_dests(ctx, b, &first, tree, &t);
+		nx_j_raw(ctx, b, "]}");
+		nx_json_done(ctx, b, out);
+	}
+	fz_always(ctx) {
+		pdf_drop_obj(ctx, tree);
+		free(t.s);
+	}
+	fz_catch(ctx) { nx_json_fail(ctx, b, out); }
+}

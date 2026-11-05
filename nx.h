@@ -69,6 +69,7 @@ void nx_image_rects(fz_context *ctx, fz_document *doc, int pno, int xref, nx_jso
 int nx_xref_len(fz_context *ctx, fz_document *doc);
 void nx_xref_object(fz_context *ctx, fz_document *doc, int xref, nx_json *out);
 void nx_table_page(fz_context *ctx, fz_document *doc, int pno, nx_json *out);
+void nx_dest_names(fz_context *ctx, fz_document *doc, nx_json *out);
 
 // Writing (nx_write.c).
 typedef struct nx_writer nx_writer;
