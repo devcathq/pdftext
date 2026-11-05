@@ -68,10 +68,14 @@ void nx_image(fz_context *ctx, fz_document *doc, int xref, int rgb, nx_json *out
 void nx_image_rects(fz_context *ctx, fz_document *doc, int pno, int xref, nx_json *out);
 int nx_xref_len(fz_context *ctx, fz_document *doc);
 void nx_xref_object(fz_context *ctx, fz_document *doc, int xref, nx_json *out);
+void nx_table_page(fz_context *ctx, fz_document *doc, int pno, nx_json *out);
 
 // Shared by the readers (nx.c, nx_json.c).
 fz_stext_page *nx_textpage(fz_context *ctx, fz_document *doc, int pno, int flags);
 fz_rect nx_char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch);
+fz_rect nx_char_bbox_small(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch, int small);
+void nx_write_rawdict(fz_context *ctx, fz_document *doc, int pno, int flags, int small, const fz_matrix *ctm, fz_buffer *b);
+void nx_write_drawings(fz_context *ctx, fz_document *doc, int pno, int extended, fz_buffer *b);
 int nx_overlap(fz_rect a, fz_rect b);
 void nx_put_rune(char **buf, int *n, int *cap, int c);
 void nx_put_raw_escape(char **buf, int *n, int *cap, const char *s, size_t len);

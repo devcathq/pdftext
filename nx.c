@@ -56,14 +56,17 @@ static void put_rune(char **buf, int *n, int *cap, int c) {
 	put_utf8(buf, n, cap, c);
 }
 
-static fz_quad char_quad(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch) {
+// char_quad is JM_char_quad; small is TOOLS.set_small_glyph_heights(True),
+// which find_tables turns on: every glyph's box then comes from its font's
+// ascender and descender.
+static fz_quad char_quad(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch, int small) {
 	if (line->wmode) return ch->quad;
 	fz_font *font = ch->font;
 	float asc = fz_font_ascender(ctx, font), dsc = fz_font_descender(ctx, font);
 	float fsize = ch->size, asc_dsc = asc - dsc + FLT_EPSILON;
-	if (asc_dsc >= 1) return ch->quad;
+	if (asc_dsc >= 1 && !small) return ch->quad;
 	if (asc < 1e-3) { dsc = -0.1f; asc = 0.9f; asc_dsc = 1.0f; }
-	if (asc_dsc < 1) { dsc = dsc / asc_dsc; asc = asc / asc_dsc; }
+	if (small || asc_dsc < 1) { dsc = dsc / asc_dsc; asc = asc / asc_dsc; }
 	asc_dsc = asc - dsc;
 	asc = asc * fsize / asc_dsc;
 	dsc = dsc * fsize / asc_dsc;
@@ -89,10 +92,14 @@ static fz_quad char_quad(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch
 	return fz_transform_quad(fz_transform_quad(q, trm2), xlate2);
 }
 
-static fz_rect char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch) {
-	fz_rect r = fz_rect_from_quad(char_quad(ctx, line, ch));
+static fz_rect char_bbox_of(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch, int small) {
+	fz_rect r = fz_rect_from_quad(char_quad(ctx, line, ch, small));
 	if (line->wmode && r.y1 < r.y0 + ch->size) r.y0 = r.y1 - ch->size;
 	return r;
+}
+
+static fz_rect char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch) {
+	return char_bbox_of(ctx, line, ch, 0);
 }
 
 static int overlap(fz_rect a, fz_rect b) {
@@ -104,7 +111,11 @@ static int in_page(fz_context *ctx, fz_rect page, fz_stext_line *line, fz_stext_
 }
 
 fz_rect nx_char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch) {
-	return char_bbox(ctx, line, ch);
+	return char_bbox_of(ctx, line, ch, 0);
+}
+
+fz_rect nx_char_bbox_small(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch, int small) {
+	return char_bbox_of(ctx, line, ch, small);
 }
 
 int nx_overlap(fz_rect a, fz_rect b) { return overlap(a, b); }

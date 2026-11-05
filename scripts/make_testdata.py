@@ -17,7 +17,7 @@ Usage: python scripts/make_testdata.py testdata
   and a rotated page
   (for Drawings);
 - tables.pdf: ruled tables with a header row, an empty cell, a merged cell
-  and a cell of two lines, beside running text (for Blocks, RawDict and the
+  and a cell of two lines, beside running text, and a table on a rotated page (for Blocks, RawDict and the
   table finder);
 - image_kinds.pdf: an RGB image with an alpha mask, a CMYK JPEG, a grey
   image, a logo placed twice and an image inside a Form XObject (for
@@ -232,6 +232,15 @@ def tables(c):
         ["101", "52.3", "A Co.", "1,200"],
         ["102", "48.1", "B Co.", "1,100"],
         ["201", "60.0", "", "0"],
+    ])
+    c.showPage()
+    c.setPageRotation(90)
+    c.setFont("Helvetica", 10)
+    c.drawString(60, h - 60, "A table on a rotated page")
+    ruled_table(c, 60, h - 80, [120, 80, 80], 24, [
+        ["Item", "2025", "2026"],
+        ["Rent", "1,200", "1,260"],
+        ["Service", "300", "310"],
     ])
     c.showPage()
 

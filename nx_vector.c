@@ -534,16 +534,15 @@ static void put_path(fz_context *ctx, fz_buffer *b, path *p, int extended) {
 	nx_j_raw(ctx, b, "}");
 }
 
-void nx_drawings(fz_context *ctx, fz_document *doc, int pno, int extended, nx_json *out) {
+// nx_write_drawings appends page pno's drawings to b. It throws on failure.
+void nx_write_drawings(fz_context *ctx, fz_document *doc, int pno, int extended, fz_buffer *b) {
 	fz_page *page = NULL;
 	lineart *d = NULL;
-	fz_buffer *b = NULL;
 	pdf_obj *pobj = NULL;
 	int old = 0;
-	fz_var(page); fz_var(d); fz_var(b); fz_var(pobj); fz_var(old);
+	fz_var(page); fz_var(d); fz_var(pobj); fz_var(old);
 	pdf_document *pdf = pdf_specifics(ctx, doc);
 	fz_try(ctx) {
-		b = fz_new_buffer(ctx, 1 << 14);
 		page = fz_load_page(ctx, doc, pno);
 		if (pdf) {
 			pobj = pdf_lookup_page_obj(ctx, pdf, pno);
@@ -579,12 +578,22 @@ void nx_drawings(fz_context *ctx, fz_document *doc, int pno, int extended, nx_js
 			put_path(ctx, b, d->out + i, extended);
 		}
 		nx_j_raw(ctx, b, "]");
-		nx_json_done(ctx, b, out);
 	}
 	fz_always(ctx) {
 		if (pobj && old) pdf_dict_put_int(ctx, pobj, PDF_NAME(Rotate), old);
 		fz_drop_device(ctx, &d->super);
 		fz_drop_page(ctx, page);
+	}
+	fz_catch(ctx) { fz_rethrow(ctx); }
+}
+
+void nx_drawings(fz_context *ctx, fz_document *doc, int pno, int extended, nx_json *out) {
+	fz_buffer *b = NULL;
+	fz_var(b);
+	fz_try(ctx) {
+		b = fz_new_buffer(ctx, 1 << 14);
+		nx_write_drawings(ctx, doc, pno, extended, b);
+		nx_json_done(ctx, b, out);
 	}
 	fz_catch(ctx) { nx_json_fail(ctx, b, out); }
 }
