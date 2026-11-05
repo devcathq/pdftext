@@ -50,3 +50,6 @@ func (*Doc) XrefLength() int { return 0 }
 
 // XrefObject returns ErrUnavailable in this build.
 func (*Doc) XrefObject(int) (string, error) { return "", ErrUnavailable }
+
+// FindTables returns ErrUnavailable in this build.
+func (*Doc) FindTables(int) ([]Table, error) { return nil, ErrUnavailable }

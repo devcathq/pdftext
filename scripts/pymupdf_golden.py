@@ -17,8 +17,10 @@ drawings (get_drawings(), and get_drawings(extended=True)), with PyMuPDF's
 Rect, Point and Quad written as lists; its images (get_images(full=True)),
 each image's Pixmap(doc, xref) as is and converted to RGB (size,
 components, alpha, colourspace, digest, and the SHA-256 of tobytes("png") or
-the error it raises), and where the page draws each (get_image_rects). Per
-file, the xref table: xref_length() and every xref_object().
+the error it raises), and where the page draws each (get_image_rects); and
+last, as it changes a rotated page, its tables (find_tables(): each table's
+bbox, row and column counts, cells, rows and extract()). Per file, the xref
+table before any page is read: xref_length() and every xref_object().
 """
 import glob
 import hashlib
@@ -95,6 +97,15 @@ def page_record(page, dpis):
     }
     if dpis:
         rec["renders"] = [render(page, d) for d in dpis]
+    rec["tables"] = [
+        {
+            "bbox": list(t.bbox), "row_count": t.row_count, "col_count": t.col_count,
+            "cells": [list(c) for c in t.cells],
+            "rows": [[list(c) if c else None for c in r.cells] for r in t.rows],
+            "extract": t.extract(),
+        }
+        for t in page.find_tables().tables
+    ]
     return rec
 
 
@@ -112,9 +123,9 @@ def main(folder, dpis):
             rec = {"file": os.path.basename(path), "pymupdf": fitz.VersionBind}
             try:
                 doc = fitz.open(path)
-                rec["pages"] = [page_record(p, dpis) for p in doc]
                 rec["xref_length"] = doc.xref_length()
                 rec["xref_objects"] = [xref_object(doc, x) for x in range(1, doc.xref_length())]
+                rec["pages"] = [page_record(p, dpis) for p in doc]
             except Exception as e:  # noqa: BLE001 - recorded, the Go side must fail too
                 rec["error"] = f"{type(e).__name__}: {e}"
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")

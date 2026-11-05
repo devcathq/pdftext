@@ -39,6 +39,7 @@ type golden struct {
 		ImagesFull any         `json:"images_full"`
 		Pixmaps    []pixmapRec `json:"pixmaps"`
 		ImageRects [][]any     `json:"image_rects"`
+		Tables     any         `json:"tables"`
 	} `json:"pages"`
 	XrefLength  int       `json:"xref_length"`
 	XrefObjects []*string `json:"xref_objects"`
@@ -132,6 +133,8 @@ func comparePDF(t *testing.T, path string, g golden) int {
 			t.Errorf("%s page %d: blocks, rawdict or drawings differ", g.File, i+1)
 		case !sameImages(t, doc, g.File, i, want.ImagesFull, want.Pixmaps, want.ImageRects):
 			t.Errorf("%s page %d: images differ", g.File, i+1)
+		case !sameTables(t, doc, g.File, i, want.Tables): // last: it changes a rotated page
+			t.Errorf("%s page %d: tables differ", g.File, i+1)
 		default:
 			same++
 		}
@@ -384,4 +387,57 @@ func sameXrefs(t *testing.T, doc *Doc, g golden) {
 			t.Errorf("%s: xref %d: Go %q (%v), PyMuPDF %q", g.File, i+1, short(got), err, short(*want))
 		}
 	}
+}
+
+// sameTables compares find_tables(); a golden without tables passes.
+func sameTables(t *testing.T, doc *Doc, file string, n int, want any) bool {
+	if want == nil {
+		return true
+	}
+	tables, err := doc.FindTables(n)
+	if err != nil {
+		t.Logf("%s page %d: find_tables: %v", file, n+1, err)
+		return false
+	}
+	box := func(b Box) []any { return []any{b.X0, b.Y0, b.X1, b.Y1} }
+	shape := []any{}
+	for _, tb := range tables {
+		cells := []any{}
+		for _, c := range tb.Cells {
+			cells = append(cells, box(c))
+		}
+		rows := []any{}
+		for _, r := range tb.Rows {
+			row := []any{}
+			for _, c := range r {
+				if c == nil {
+					row = append(row, nil)
+				} else {
+					row = append(row, box(*c))
+				}
+			}
+			rows = append(rows, row)
+		}
+		text := []any{}
+		for _, r := range tb.Extract() {
+			row := []any{}
+			for _, c := range r {
+				if c == nil {
+					row = append(row, nil)
+				} else {
+					row = append(row, *c)
+				}
+			}
+			text = append(text, row)
+		}
+		shape = append(shape, map[string]any{
+			"bbox": box(tb.BBox), "row_count": tb.RowCount, "col_count": tb.ColCount,
+			"cells": cells, "rows": rows, "extract": text,
+		})
+	}
+	if ok, diff := sameShape(shape, want); !ok {
+		t.Logf("%s page %d: tables differ at %s", file, n+1, diff)
+		return false
+	}
+	return true
 }

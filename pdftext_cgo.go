@@ -219,3 +219,17 @@ func (d *Doc) decode(out *C.nx_json, what string, v any) error {
 	}
 	return nil
 }
+
+// FindTables is page n's find_tables() with PyMuPDF's default settings (the
+// "lines" strategy): the tables of its TableFinder, with their cells, rows
+// and text. As in PyMuPDF, a rotated page is derotated to be read, which
+// leaves it with one more (blank) content stream and without its CropBox
+// and other boxes but the MediaBox. Table headers (table.header) are not
+// computed.
+func (d *Doc) FindTables(n int) ([]Table, error) {
+	var in tableInput
+	if err := d.read(n, "find_tables", &in, func(out *C.nx_json) { C.nx_table_page(d.ctx, d.doc, C.int(n), out) }); err != nil {
+		return nil, err
+	}
+	return findTables(in, n), nil
+}

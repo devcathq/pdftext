@@ -145,16 +145,24 @@ typedef struct {
 	float size; int flags; unsigned cflags; text font; uint32_t argb;
 } style;
 
+// dictopts: small is find_tables' small glyph heights; with ctm, each char
+// also gets its box mapped by it (ctm_bbox), as make_chars computes.
+typedef struct { int small, has_ctm; fz_matrix ctm; } dictopts;
+
 static int same_style(style *a, style *b) {
 	return a->size == b->size && a->flags == b->flags && a->cflags == b->cflags && a->argb == b->argb &&
 		a->font.n == b->font.n && !memcmp(a->font.s, b->font.s, a->font.n);
 }
 
-static void put_char(fz_context *ctx, fz_buffer *b, int first, fz_stext_char *ch, fz_rect r, text *tmp) {
+static void put_char(fz_context *ctx, fz_buffer *b, int first, fz_stext_char *ch, fz_rect r, text *tmp, const dictopts *o) {
 	nx_j_raw(ctx, b, first ? "{\"origin\":" : ",{\"origin\":");
 	nx_j_point(ctx, b, ch->origin);
 	nx_j_raw(ctx, b, ",\"bbox\":");
 	nx_j_rect(ctx, b, r);
+	if (o->has_ctm) {
+		nx_j_raw(ctx, b, ",\"ctm_bbox\":");
+		nx_j_rect(ctx, b, fz_transform_rect(r, o->ctm));
+	}
 	tmp->n = 0;
 	int c = ch->c;
 	if (c < 0 || c > 0x10ffff || (c >= 0xd800 && c <= 0xdfff)) c = 0xfffd;
@@ -192,14 +200,14 @@ static void close_span(fz_context *ctx, fz_buffer *b, fz_point origin, fz_rect r
 // flags, char flags, colour or font change. Every span is kept but the
 // last, which is dropped when its box is empty; a dropped span's JSON is cut
 // back off the buffer.
-static fz_rect line_spans(fz_context *ctx, fz_buffer *b, fz_rect tp, fz_stext_line *line, style *old, style *cur, text *tmp) {
+static fz_rect line_spans(fz_context *ctx, fz_buffer *b, fz_rect tp, fz_stext_line *line, style *old, style *cur, text *tmp, const dictopts *o) {
 	fz_rect span = fz_empty_rect, lr = fz_empty_rect;
 	fz_point origin = {0, 0};
 	int open = 0, nspans = 0, nchars = 0;
 	size_t start = 0;
 	old->size = -1;
 	for (fz_stext_char *ch = line->first_char; ch; ch = ch->next) {
-		fz_rect r = nx_char_bbox(ctx, line, ch);
+		fz_rect r = nx_char_bbox_small(ctx, line, ch, o->small);
 		if (!nx_overlap(tp, r) && !fz_is_infinite_rect(tp)) continue;
 		cur->size = ch->size;
 		cur->flags = char_flags(ctx, line, ch);
@@ -231,7 +239,7 @@ static fz_rect line_spans(fz_context *ctx, fz_buffer *b, fz_rect tp, fz_stext_li
 			origin = ch->origin;
 		}
 		span = fz_union_rect(span, r);
-		put_char(ctx, b, nchars++ == 0, ch, r, tmp);
+		put_char(ctx, b, nchars++ == 0, ch, r, tmp, o);
 	}
 	if (open) {
 		if (!fz_is_empty_rect(span)) {
@@ -315,7 +323,7 @@ static void image_block(fz_context *ctx, fz_buffer *b, fz_stext_block *block) {
 
 // as_dict is _as_dict with raw=1 for the blocks TEXTFLAGS_RAWDICT makes:
 // text blocks touching the page and image blocks inside it.
-static int as_dict(fz_context *ctx, fz_buffer *b, int *first, fz_rect tp, fz_stext_block *block, int n, style *old, style *cur, text *tmp) {
+static int as_dict(fz_context *ctx, fz_buffer *b, int *first, fz_rect tp, fz_stext_block *block, int n, style *old, style *cur, text *tmp, const dictopts *o) {
 	for (; block; block = block->next) {
 		if (block->type == FZ_STEXT_BLOCK_TEXT && (nx_overlap(tp, block->bbox) || fz_is_infinite_rect(tp))) {
 			nx_j_raw(ctx, b, *first ? "{\"type\":0,\"number\":" : ",{\"type\":0,\"number\":");
@@ -329,7 +337,7 @@ static int as_dict(fz_context *ctx, fz_buffer *b, int *first, fz_rect tp, fz_ste
 			for (fz_stext_line *line = block->u.t.first_line; line; line = line->next) {
 				if (fz_is_empty_rect(fz_intersect_rect(tp, line->bbox)) && !fz_is_infinite_rect(tp)) continue;
 				nx_j_raw(ctx, b, nl++ ? ",{\"spans\":[" : "{\"spans\":[");
-				fz_rect lr = line_spans(ctx, b, tp, line, old, cur, tmp);
+				fz_rect lr = line_spans(ctx, b, tp, line, old, cur, tmp, o);
 				br = fz_union_rect(br, lr);
 				nx_j_raw(ctx, b, "],\"wmode\":");
 				nx_j_int(ctx, b, line->wmode);
@@ -372,15 +380,16 @@ static void cropbox_size(fz_context *ctx, pdf_obj *page, double *w, double *h) {
 	*h = dh > 0 ? dh : 0;
 }
 
-void nx_rawdict(fz_context *ctx, fz_document *doc, int pno, nx_json *out) {
+// nx_write_rawdict appends page pno's rawdict, read with these flags, to b.
+// It throws on failure.
+void nx_write_rawdict(fz_context *ctx, fz_document *doc, int pno, int flags, int small, const fz_matrix *ctm, fz_buffer *b) {
 	fz_stext_page *tp = NULL;
-	fz_buffer *b = NULL;
 	style old = {0}, cur = {0};
 	text tmp = {0};
-	fz_var(tp); fz_var(b);
+	dictopts o = {small, ctm != NULL, ctm ? *ctm : fz_identity};
+	fz_var(tp);
 	fz_try(ctx) {
-		b = fz_new_buffer(ctx, 1 << 16);
-		tp = nx_textpage(ctx, doc, pno, FLAGS_DICT);
+		tp = nx_textpage(ctx, doc, pno, flags);
 		int first = 1;
 		double w = tp->mediabox.x1 - (double)tp->mediabox.x0, h = tp->mediabox.y1 - (double)tp->mediabox.y0;
 		pdf_document *pdf = pdf_specifics(ctx, doc);
@@ -390,15 +399,25 @@ void nx_rawdict(fz_context *ctx, fz_document *doc, int pno, nx_json *out) {
 		nx_j_raw(ctx, b, ",\"height\":");
 		nx_j_double(ctx, b, h);
 		nx_j_raw(ctx, b, ",\"blocks\":[");
-		as_dict(ctx, b, &first, tp->mediabox, tp->first_block, -1, &old, &cur, &tmp);
+		as_dict(ctx, b, &first, tp->mediabox, tp->first_block, -1, &old, &cur, &tmp, &o);
 		nx_j_raw(ctx, b, "]}");
-		nx_json_done(ctx, b, out);
 	}
 	fz_always(ctx) {
 		fz_drop_stext_page(ctx, tp);
 		free(old.font.s);
 		free(cur.font.s);
 		free(tmp.s);
+	}
+	fz_catch(ctx) { fz_rethrow(ctx); }
+}
+
+void nx_rawdict(fz_context *ctx, fz_document *doc, int pno, nx_json *out) {
+	fz_buffer *b = NULL;
+	fz_var(b);
+	fz_try(ctx) {
+		b = fz_new_buffer(ctx, 1 << 16);
+		nx_write_rawdict(ctx, doc, pno, FLAGS_DICT, 0, NULL, b);
+		nx_json_done(ctx, b, out);
 	}
 	fz_catch(ctx) { nx_json_fail(ctx, b, out); }
 }
