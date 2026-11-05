@@ -103,6 +103,14 @@ static int in_page(fz_context *ctx, fz_rect page, fz_stext_line *line, fz_stext_
 	return fz_is_infinite_rect(page) || overlap(page, char_bbox(ctx, line, ch));
 }
 
+fz_rect nx_char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch) {
+	return char_bbox(ctx, line, ch);
+}
+
+int nx_overlap(fz_rect a, fz_rect b) { return overlap(a, b); }
+
+void nx_put_rune(char **buf, int *n, int *cap, int c) { put_rune(buf, n, cap, c); }
+
 static int delimiter(int c) { return c <= 32 || c == 160 || (c >= 0x202a && c <= 0x202e); }
 static int rtl(int c) { return c >= 0x590 && c <= 0x900; }
 
@@ -242,9 +250,10 @@ int nx_count_pages(fz_context *ctx, fz_document *doc) {
 	return n;
 }
 
-// nx_read_page is Page.get_textpage(flags=TEXTFLAGS_TEXT): the page's /Rotate
-// is set to 0 while it is read and put back after, as PyMuPDF does.
-void nx_read_page(fz_context *ctx, fz_document *doc, int pno, nx_page *out) {
+// nx_textpage is Page.get_textpage(flags=flags): the page's structured
+// text, read with its /Rotate set to 0 and put back after, as PyMuPDF does.
+// It throws on failure.
+fz_stext_page *nx_textpage(fz_context *ctx, fz_document *doc, int pno, int flags) {
 	fz_page *page = NULL;
 	fz_stext_page *tp = NULL;
 	fz_device *dev = NULL;
@@ -261,22 +270,38 @@ void nx_read_page(fz_context *ctx, fz_document *doc, int pno, nx_page *out) {
 		}
 		fz_stext_options opts;
 		memset(&opts, 0, sizeof opts);
-		opts.flags = FZ_STEXT_PRESERVE_LIGATURES | FZ_STEXT_PRESERVE_WHITESPACE |
-			FZ_STEXT_MEDIABOX_CLIP | FZ_STEXT_USE_CID_FOR_UNKNOWN_UNICODE;
+		opts.flags = flags;
 		tp = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
 		dev = fz_new_stext_device(ctx, tp, &opts);
 		fz_run_page(ctx, page, dev, fz_identity, NULL);
 		fz_close_device(ctx, dev);
-		page_words(ctx, tp->mediabox, tp->first_block, out);
-		page_plain(ctx, tp->mediabox, tp->first_block, out);
-		if (pdf) out->has_image = has_image(ctx, pdf, pno);
 	}
 	fz_always(ctx) {
 		if (pobj && old) pdf_dict_put_int(ctx, pobj, PDF_NAME(Rotate), old);
 		fz_drop_device(ctx, dev);
-		fz_drop_stext_page(ctx, tp);
 		fz_drop_page(ctx, page);
 	}
+	fz_catch(ctx) {
+		fz_drop_stext_page(ctx, tp);
+		fz_rethrow(ctx);
+	}
+	return tp;
+}
+
+// nx_read_page is Page.get_textpage(flags=TEXTFLAGS_TEXT) read as words and
+// as plain text, and the page's image scan.
+void nx_read_page(fz_context *ctx, fz_document *doc, int pno, nx_page *out) {
+	fz_stext_page *tp = NULL;
+	fz_var(tp);
+	pdf_document *pdf = pdf_specifics(ctx, doc);
+	fz_try(ctx) {
+		tp = nx_textpage(ctx, doc, pno, FZ_STEXT_PRESERVE_LIGATURES | FZ_STEXT_PRESERVE_WHITESPACE |
+			FZ_STEXT_MEDIABOX_CLIP | FZ_STEXT_USE_CID_FOR_UNKNOWN_UNICODE);
+		page_words(ctx, tp->mediabox, tp->first_block, out);
+		page_plain(ctx, tp->mediabox, tp->first_block, out);
+		if (pdf) out->has_image = has_image(ctx, pdf, pno);
+	}
+	fz_always(ctx) { fz_drop_stext_page(ctx, tp); }
 	fz_catch(ctx) { out->failed = 1; }
 }
 

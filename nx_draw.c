@@ -92,36 +92,14 @@ static void add_box(nx_boxes *b, fz_rect r) {
 // nx_image_boxes is extractIMGINFO's bbox of each image block of the page's
 // text page, in block order.
 void nx_image_boxes(fz_context *ctx, fz_document *doc, int pno, nx_boxes *out) {
-	fz_page *page = NULL;
 	fz_stext_page *tp = NULL;
-	fz_device *dev = NULL;
-	pdf_obj *pobj = NULL;
-	int old = 0;
-	fz_var(page); fz_var(tp); fz_var(dev); fz_var(pobj); fz_var(old);
-	pdf_document *pdf = pdf_specifics(ctx, doc);
+	fz_var(tp);
 	fz_try(ctx) {
-		page = fz_load_page(ctx, doc, pno);
-		if (pdf) {
-			pobj = pdf_lookup_page_obj(ctx, pdf, pno);
-			old = nx_norm_rotation(pdf_to_int(ctx, pdf_dict_get_inheritable(ctx, pobj, PDF_NAME(Rotate))));
-			if (old) pdf_dict_put_int(ctx, pobj, PDF_NAME(Rotate), 0);
-		}
-		fz_stext_options opts;
-		memset(&opts, 0, sizeof opts);
-		opts.flags = FZ_STEXT_PRESERVE_IMAGES;
-		tp = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
-		dev = fz_new_stext_device(ctx, tp, &opts);
-		fz_run_page(ctx, page, dev, fz_identity, NULL);
-		fz_close_device(ctx, dev);
+		tp = nx_textpage(ctx, doc, pno, FZ_STEXT_PRESERVE_IMAGES);
 		for (fz_stext_block *b = tp->first_block; b; b = b->next)
 			if (b->type == FZ_STEXT_BLOCK_IMAGE) add_box(out, b->bbox);
 	}
-	fz_always(ctx) {
-		if (pobj && old) pdf_dict_put_int(ctx, pobj, PDF_NAME(Rotate), old);
-		fz_drop_device(ctx, dev);
-		fz_drop_stext_page(ctx, tp);
-		fz_drop_page(ctx, page);
-	}
+	fz_always(ctx) { fz_drop_stext_page(ctx, tp); }
 	fz_catch(ctx) { out->failed = 1; }
 }
 

@@ -28,6 +28,13 @@ type golden struct {
 		Rect   []float64   `json:"rect"`
 		Boxes  [][]float64 `json:"image_boxes"`
 		Draws  []drawn     `json:"renders"`
+
+		// Written since blocks, rawdict and drawings were added; nil in
+		// an older golden.
+		Blocks      any `json:"blocks"`
+		RawDict     any `json:"rawdict"`
+		Drawings    any `json:"drawings"`
+		DrawingsExt any `json:"drawings_extended"`
 	} `json:"pages"`
 }
 
@@ -114,6 +121,8 @@ func comparePDF(t *testing.T, path string, g golden) int {
 			t.Errorf("%s page %d: page box or image boxes differ", g.File, i+1)
 		case !sameDrawings(t, doc, g.File, i, want.Draws):
 			t.Errorf("%s page %d: drawn differently", g.File, i+1)
+		case !sameStructure(t, doc, g.File, i, want.Blocks, want.RawDict, want.Drawings, want.DrawingsExt):
+			t.Errorf("%s page %d: blocks, rawdict or drawings differ", g.File, i+1)
 		default:
 			same++
 		}
@@ -207,4 +216,40 @@ func rgbSamples(data []byte) ([]byte, error) {
 func digest(b []byte) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
+}
+
+// sameStructure compares the page's blocks, rawdict and drawings (plain and
+// extended) with PyMuPDF's; those a golden did not record pass.
+func sameStructure(t *testing.T, doc *Doc, file string, n int, blocks, raw, drawings, ext any) bool {
+	check := func(what string, want any, read func() (any, error)) bool {
+		if want == nil {
+			return true
+		}
+		got, err := read()
+		if err != nil {
+			t.Logf("%s page %d: %s: %v", file, n+1, what, err)
+			return false
+		}
+		if ok, diff := sameShape(got, want); !ok {
+			t.Logf("%s page %d: %s differ at %s", file, n+1, what, diff)
+			return false
+		}
+		return true
+	}
+	ok := check("blocks", blocks, func() (any, error) {
+		b, err := doc.Blocks(n)
+		return blocksShape(b), err
+	})
+	ok = check("rawdict", raw, func() (any, error) {
+		r, err := doc.RawDict(n)
+		return rawdictShape(r), err
+	}) && ok
+	ok = check("drawings", drawings, func() (any, error) {
+		p, err := doc.Drawings(n, false)
+		return drawingsShape(p, false), err
+	}) && ok
+	return check("drawings extended", ext, func() (any, error) {
+		p, err := doc.Drawings(n, true)
+		return drawingsShape(p, true), err
+	}) && ok
 }
