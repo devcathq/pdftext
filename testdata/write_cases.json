@@ -1,0 +1,51 @@
+[
+  {"name": "skeleton", "ops": [
+    {"op": "new"},
+    {"op": "new_page", "w": 595, "h": 842},
+    {"op": "draw_rect", "page": 0, "rect": [40, 40, 555, 120], "color": null, "fill": [0.95, 0.93, 0.89]},
+    {"op": "draw_rect", "page": 0, "rect": [40, 140, 300, 260], "color": [0.85, 0.83, 0.79], "width": 0.5},
+    {"op": "draw_rect", "page": 0, "rect": [320, 140, 555, 260], "color": [0.2, 0.2, 0.2], "fill": [1, 1, 1], "width": 0.4},
+    {"op": "draw_line", "page": 0, "p1": [40, 300], "p2": [555, 300], "color": [0.55, 0.52, 0.47], "width": 0.7},
+    {"op": "draw_line", "page": 0, "p1": [40, 320.5], "p2": [555, 320.5], "color": [0.89, 0.88, 0.85], "width": 0.4},
+    {"op": "insert_text", "page": 0, "point": [50, 80], "text": "Quarterly report, July 2026", "fontname": "helv", "fontsize": 14, "color": [0.2, 0.19, 0.17]},
+    {"op": "insert_text", "page": 0, "point": [50, 100], "text": "Bold by render mode", "fontname": "helv", "fontsize": 10, "color": [0, 0, 0], "render_mode": 2},
+    {"op": "insert_text", "page": 0, "point": [50, 180], "text": "物件概要 学芸大学", "fontname": "japan", "fontsize": 11, "color": [0.1, 0.1, 0.1]},
+    {"op": "insert_text", "page": 0, "point": [50, 200], "text": "Two lines\nof text", "fontname": "helv", "fontsize": 9},
+    {"op": "insert_textbox", "page": 0, "rect": [40, 800, 297.5, 830], "text": "Footer left", "fontname": "helv", "fontsize": 7, "color": [0.45, 0.45, 0.45]},
+    {"op": "insert_textbox", "page": 0, "rect": [297.5, 800, 555, 830], "text": "p. 1 / 1", "fontname": "helv", "fontsize": 7, "color": [0.45, 0.45, 0.45], "align": 2},
+    {"op": "insert_textbox", "page": 0, "rect": [40, 400, 300, 470], "text": "A long paragraph that has to wrap over several lines inside its box, with a word too long to fit: Supercalifragilisticexpialidocious-and-more.", "fontname": "helv", "fontsize": 10, "align": 3},
+    {"op": "insert_textbox", "page": 0, "rect": [320, 400, 555, 470], "text": "中央に置いた日本語の文章です。", "fontname": "japan", "fontsize": 10, "align": 1},
+    {"op": "insert_textbox", "page": 0, "rect": [40, 500, 140, 505], "text": "Does not fit", "fontname": "helv", "fontsize": 9},
+    {"op": "insert_text", "page": 0, "point": [50, 560], "text": "Half transparent", "fontname": "helv", "fontsize": 12, "color": [0.8, 0.1, 0.1], "fill_opacity": 0.5},
+    {"op": "new_page", "w": 842, "h": 595},
+    {"op": "insert_text", "page": 1, "point": [60, 60], "text": "Landscape page", "fontname": "tiro", "fontsize": 16},
+    {"op": "draw_rect", "page": 1, "rect": [60, 80, 780, 82], "color": null, "fill": [0, 0, 0]}
+  ]},
+  {"name": "story", "ops": [
+    {"op": "story", "mediabox": [0, 0, 595, 842], "rect": [56, 56, 539, 754],
+     "css": "body {font-family: sans-serif; font-size: 10pt;} h1 {font-size: 16pt;} td, th {border: 0.5pt solid #888; padding: 2pt;} table {border-collapse: collapse;}",
+     "groups": [
+       "<h1>Notes to the financial statements</h1><p>The Fund invests in real estate in Tokyo. 当ファンドは東京の不動産に投資します。</p><table><tr><th>Item</th><th>2025</th><th>2026</th></tr><tr><td>Rent</td><td>1,200</td><td>1,260</td></tr><tr><td>Service</td><td>300</td><td>310</td></tr></table>",
+       "<h1>Second group</h1>LONGTEXT"
+     ]},
+    {"op": "insert_textbox", "page": 0, "rect": [56, 790, 297.5, 820], "text": "Fund report", "fontname": "helv", "fontsize": 8, "color": [0.3, 0.3, 0.3]},
+    {"op": "insert_textbox", "page": 0, "rect": [297.5, 790, 539, 820], "text": "p. 1 / N", "fontname": "helv", "fontsize": 8, "color": [0.3, 0.3, 0.3], "align": 2}
+  ]},
+  {"name": "metadata", "ops": [
+    {"op": "open", "file": "images.pdf"},
+    {"op": "metadata"},
+    {"op": "set_metadata", "meta": {"title": "Specimen", "author": "pdftext", "keywords": "report-format-engine=skeleton", "subject": ""}},
+    {"op": "reopen"},
+    {"op": "metadata"}
+  ]},
+  {"name": "split", "ops": [
+    {"op": "open", "file": "many_pages.pdf"},
+    {"op": "extract_pages", "pages": [2, 0, 5]}
+  ]},
+  {"name": "text_length", "ops": [
+    {"op": "text_length", "font": "helv", "text": "Hello, world", "size": 11},
+    {"op": "text_length", "font": "helv", "text": "Mixed 漢字 text", "size": 9},
+    {"op": "text_length", "font": "japan", "text": "物件概要 Ikejiri", "size": 10},
+    {"op": "text_length", "font": "tibo", "text": "", "size": 10}
+  ]}
+]

@@ -70,6 +70,32 @@ int nx_xref_len(fz_context *ctx, fz_document *doc);
 void nx_xref_object(fz_context *ctx, fz_document *doc, int xref, nx_json *out);
 void nx_table_page(fz_context *ctx, fz_document *doc, int pno, nx_json *out);
 
+// Writing (nx_write.c).
+typedef struct nx_writer nx_writer;
+fz_document *nx_new_pdf(fz_context *ctx);
+int nx_new_page(fz_context *ctx, fz_document *doc, float w, float h, char *err, int nerr);
+int nx_page_geom(fz_context *ctx, fz_document *doc, int pno, float *out, char *err, int nerr);
+int nx_page_font(fz_context *ctx, fz_document *doc, int pno, const char *ref);
+int nx_insert_font(fz_context *ctx, fz_document *doc, int pno, const char *ref, const char *bfname, int ordering,
+	int serif, int *xref, char *name, int nname, float *asc, float *dsc, char *err, int nerr);
+int nx_glyph_widths(fz_context *ctx, const char *bfname, int limit, int *glyphs, float *adv);
+int nx_set_opacity(fz_context *ctx, fz_document *doc, int pno, const char *gs, float CA, float ca, char *err, int nerr);
+int nx_commit(fz_context *ctx, fz_document *doc, int pno, const char *data, size_t n, int overlay, char *err, int nerr);
+void nx_tobytes(fz_context *ctx, fz_document *doc, nx_json *out);
+void nx_extract_pages(fz_context *ctx, fz_document *doc, const int *pages, int n, nx_json *out);
+void nx_metadata(fz_context *ctx, fz_document *doc, nx_json *out);
+int nx_set_info(fz_context *ctx, fz_document *doc, const char *key, const char *value, char *err, int nerr);
+double nx_text_length(fz_context *ctx, const char *name, int ordering, const int *codes, int n, double size);
+nx_writer *nx_new_writer(fz_context *ctx, char *err, int nerr);
+int nx_writer_begin(fz_context *ctx, nx_writer *w, float x0, float y0, float x1, float y1, char *err, int nerr);
+int nx_writer_end(fz_context *ctx, nx_writer *w, char *err, int nerr);
+int nx_writer_close(fz_context *ctx, nx_writer *w, unsigned char **data, size_t *n, char *err, int nerr);
+void nx_drop_writer(fz_context *ctx, nx_writer *w);
+fz_story *nx_new_story(fz_context *ctx, const char *html, const char *css, char *err, int nerr);
+int nx_story_place(fz_context *ctx, fz_story *s, float *where, float *filled, char *err, int nerr);
+int nx_story_draw(fz_context *ctx, fz_story *s, nx_writer *w, char *err, int nerr);
+void nx_drop_story(fz_context *ctx, fz_story *s);
+
 // Shared by the readers (nx.c, nx_json.c).
 fz_stext_page *nx_textpage(fz_context *ctx, fz_document *doc, int pno, int flags);
 fz_rect nx_char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch);

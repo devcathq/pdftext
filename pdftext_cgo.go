@@ -29,6 +29,7 @@ type Doc struct {
 	doc   *C.fz_document
 	data  unsafe.Pointer
 	pages int
+	fonts map[int]*fontInfo // FontInfos: the fonts InsertText and InsertTextbox installed, by xref
 }
 
 // Open opens a PDF from memory. The bytes are copied, so data may be reused.
