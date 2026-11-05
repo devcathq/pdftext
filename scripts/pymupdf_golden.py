@@ -10,6 +10,11 @@ page lists an image, its words' texts (page.get_text("words")), its box
 (page.rect) and the boxes of the images it draws (page.get_image_info()).
 With DPIs, also each page drawn at each (page.get_pixmap(dpi=…)): its size,
 and the SHA-256 of its PNG (tobytes("png")) and of its RGB samples.
+
+Also per page: its blocks (get_text("blocks")), its rawdict
+(get_text("rawdict"), each image's and mask's bytes as their SHA-256) and its
+drawings (get_drawings(), and get_drawings(extended=True)), with PyMuPDF's
+Rect, Point and Quad written as lists.
 """
 import glob
 import hashlib
@@ -29,6 +34,22 @@ def render(page, dpi):
     }
 
 
+def plain(v):
+    """v with PyMuPDF's Rect, Point, Quad and tuples as lists, bytes as
+    their SHA-256."""
+    if isinstance(v, (fitz.Rect, fitz.Point)):
+        return [float(x) for x in v]
+    if isinstance(v, fitz.Quad):
+        return [plain(v.ul), plain(v.ur), plain(v.ll), plain(v.lr)]
+    if isinstance(v, (bytes, bytearray)):
+        return hashlib.sha256(v).hexdigest()
+    if isinstance(v, dict):
+        return {k: plain(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [plain(x) for x in v]
+    return v
+
+
 def page_record(page, dpis):
     try:
         sorted_text = page.get_text("text", sort=True)
@@ -41,6 +62,10 @@ def page_record(page, dpis):
         "words": [w[4] for w in page.get_text("words")],
         "rect": list(page.rect),
         "image_boxes": [list(i["bbox"]) for i in page.get_image_info()],
+        "blocks": plain(page.get_text("blocks")),
+        "rawdict": plain(page.get_text("rawdict")),
+        "drawings": plain(page.get_drawings()),
+        "drawings_extended": plain(page.get_drawings(extended=True)),
     }
     if dpis:
         rec["renders"] = [render(page, d) for d in dpis]

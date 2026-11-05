@@ -26,3 +26,12 @@ func (*Doc) Render(int, int) (Picture, error) { return Picture{}, ErrUnavailable
 
 // ImageBoxes returns ErrUnavailable in this build.
 func (*Doc) ImageBoxes(int) ([]Rect, error) { return nil, ErrUnavailable }
+
+// Blocks returns ErrUnavailable in this build.
+func (*Doc) Blocks(int) ([]Block, error) { return nil, ErrUnavailable }
+
+// RawDict returns ErrUnavailable in this build.
+func (*Doc) RawDict(int) (TextDict, error) { return TextDict{}, ErrUnavailable }
+
+// Drawings returns ErrUnavailable in this build.
+func (*Doc) Drawings(int, bool) ([]Path, error) { return nil, ErrUnavailable }

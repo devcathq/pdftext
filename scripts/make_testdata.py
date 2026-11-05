@@ -10,7 +10,15 @@ Usage: python scripts/make_testdata.py testdata
 - many_pages.pdf: seven pages of a short invoice-like layout;
 - images.pdf: a page covered by a scanned-looking image, a page with a logo,
   a note annotation and an image partly off the page, a rotated page with an
-  image, and a blank page (for Render, ImageBoxes and Bounds).
+  image, and a blank page (for Render, ImageBoxes and Bounds);
+- drawings.pdf: rules of several widths, caps and dashes, stroked, filled
+  and filled-and-stroked boxes, circles and curves, closed quads, colours in
+  grey, RGB and CMYK, a transparent fill, a clipped page with a blended fill
+  and a rotated page
+  (for Drawings);
+- tables.pdf: ruled tables with a header row, an empty cell, a merged cell
+  and a cell of two lines, beside running text (for Blocks, RawDict and the
+  table finder).
 """
 import os
 import sys
@@ -104,10 +112,131 @@ def images(c):
     c.showPage()
 
 
+def drawings(c):
+    w, h = A4
+    for i, (width, cap, dash) in enumerate([(0.5, 0, None), (1, 1, None), (2, 2, None), (1.5, 0, [6, 3]), (1, 0, [1, 2, 3])]):
+        c.setLineWidth(width)
+        c.setLineCap(cap)
+        c.setDash(dash or [])
+        c.line(60, h - 60 - 20 * i, 300, h - 60 - 20 * i)
+    c.setDash([])
+    c.setLineWidth(1)
+    c.setStrokeColorRGB(0.8, 0.1, 0.1)
+    c.rect(60, 560, 120, 80, stroke=1, fill=0)
+    c.setFillColorRGB(0.1, 0.4, 0.8)
+    c.rect(200, 560, 120, 80, stroke=0, fill=1)
+    c.setFillColorCMYK(0.1, 0.0, 0.6, 0.0)
+    c.setStrokeGray(0.2)
+    c.rect(340, 560, 120, 80, stroke=1, fill=1)
+    c.setFillColorRGB(0.9, 0.6, 0.1)
+    c.setFillAlpha(0.5)
+    c.circle(120, 460, 50, stroke=1, fill=1)
+    c.setFillAlpha(1)
+    c.roundRect(200, 410, 120, 100, 15, stroke=1, fill=0)
+    p = c.beginPath()
+    p.moveTo(360, 420)
+    p.lineTo(460, 430)
+    p.lineTo(450, 500)
+    p.lineTo(370, 490)
+    p.close()
+    c.drawPath(p, stroke=1, fill=0)
+    p = c.beginPath()
+    p.moveTo(480, 420)
+    p.lineTo(540, 425)
+    p.lineTo(535, 500)
+    p.lineTo(485, 495)
+    p.lineTo(480, 420)
+    c.drawPath(p, stroke=1, fill=0)
+    p = c.beginPath()
+    p.moveTo(60, 340)
+    p.curveTo(120, 400, 180, 280, 240, 340)
+    c.drawPath(p, stroke=1, fill=0)
+    c.setFont("Helvetica", 10)
+    c.drawString(60, 300, "Rules, boxes and curves.")
+    c.showPage()
+    c.saveState()
+    p = c.beginPath()
+    p.rect(100, 400, 200, 200)
+    c.clipPath(p, stroke=0, fill=0)
+    c.setFillColorRGB(0.2, 0.7, 0.3)
+    c.rect(50, 350, 300, 150, stroke=0, fill=1)
+    c.setStrokeColorRGB(0, 0, 0)
+    c.rect(150, 450, 300, 300, stroke=1, fill=0)
+    c.restoreState()
+    c.rect(60, 100, 200, 40, stroke=1, fill=0)
+    c.saveState()
+    c.setBlendMode("Multiply")
+    c.setFillColorRGB(0.9, 0.2, 0.6)
+    c.rect(300, 100, 120, 60, stroke=0, fill=1)
+    c.restoreState()
+    c.showPage()
+    c.setPageRotation(90)
+    c.setStrokeColorRGB(0, 0, 0)
+    c.line(60, 700, 400, 700)
+    c.rect(60, 500, 300, 150, stroke=1, fill=0)
+    c.setFont("Helvetica", 11)
+    c.drawString(70, 620, "A ruled box on a rotated page.")
+    c.showPage()
+
+
+def ruled_table(c, x, y, widths, height, rows, merge=None):
+    """A table ruled on every cell edge; rows are lists of cell texts (a
+    cell may hold two lines, split by \n). merge=(row, col) joins that cell
+    with the one to its right."""
+    total = sum(widths)
+    c.setLineWidth(0.75)
+    for r in range(len(rows) + 1):
+        c.line(x, y - r * height, x + total, y - r * height)
+    for r, row in enumerate(rows):
+        cx = x
+        for k, wd in enumerate(widths + [0]):
+            if not (merge and merge == (r, k)):
+                c.line(cx, y - r * height, cx, y - (r + 1) * height)
+            cx += wd
+        cx = x
+        for k, cell in enumerate(row):
+            for j, part in enumerate(cell.split("\n")):
+                c.drawString(cx + 4, y - r * height - 13 - 11 * j, part)
+            cx += widths[k]
+
+
+def tables(c):
+    w, h = A4
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(60, h - 60, "Schedule 2: Fees")
+    c.setFont("Helvetica", 10)
+    c.drawString(60, h - 80, "5.1. The Manager is paid the fees below, in arrears, each quarter.")
+    ruled_table(c, 60, h - 100, [150, 120, 120], 30, [
+        ["Fee", "Rate", "Basis"],
+        ["Management fee", "1.50%", "NAV"],
+        ["Performance fee", "15.00%", ""],
+        ["Administration\nfee", "0.10%", "NAV"],
+    ])
+    c.drawString(60, h - 260, "5.2. Fees are charged to the Fund and paid in cash.")
+    ruled_table(c, 60, h - 290, [100, 100, 100, 100], 24, [
+        ["Year", "Q1", "Q2", "Q3"],
+        ["2025", "120", "130", "125"],
+        ["2026", "140", "merged across", ""],
+    ], merge=(2, 3))
+    c.showPage()
+    c.setFont("Helvetica", 10)
+    c.drawString(60, h - 60, "Unit schedule")
+    c.setFillColorRGB(0.85, 0.85, 0.85)
+    c.rect(60, h - 100, 400, 24, stroke=0, fill=1)
+    c.setFillColorRGB(0, 0, 0)
+    ruled_table(c, 60, h - 76, [100, 100, 100, 100], 24, [
+        ["Unit", "Area", "Tenant", "Rent"],
+        ["101", "52.3", "A Co.", "1,200"],
+        ["102", "48.1", "B Co.", "1,100"],
+        ["201", "60.0", "", "0"],
+    ])
+    c.showPage()
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     for name, fill in [("columns", columns), ("rotated", rotated), ("cjk", cjk), ("many_pages", many_pages),
-                       ("images", images)]:
+                       ("images", images), ("drawings", drawings), ("tables", tables)]:
         c = canvas.Canvas(os.path.join(out, name + ".pdf"), pagesize=A4, invariant=1)
         fill(c)
         c.save()

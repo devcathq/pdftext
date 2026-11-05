@@ -16,6 +16,7 @@ package pdftext
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"unsafe"
@@ -126,4 +127,47 @@ func (d *Doc) ImageBoxes(n int) ([]Rect, error) {
 		boxes = append(boxes, Rect{float32(b.x0), float32(b.y0), float32(b.x1), float32(b.y1)})
 	}
 	return boxes, nil
+}
+
+// read runs one of the JSON readers of nx_text.c, nx_vector.c, … and
+// decodes what it wrote into v.
+func (d *Doc) read(n int, what string, v any, run func(out *C.nx_json)) error {
+	if n < 0 || n >= d.pages {
+		return fmt.Errorf("pdftext: no page %d", n+1)
+	}
+	var out C.nx_json
+	run(&out)
+	defer C.nx_free_json(d.ctx, &out)
+	if out.failed != 0 {
+		return fmt.Errorf("pdftext: page %d: %s: %s", n+1, what, C.GoString(&out.err[0]))
+	}
+	if err := json.Unmarshal(C.GoBytes(unsafe.Pointer(out.data), C.int(out.n)), v); err != nil {
+		return fmt.Errorf("pdftext: page %d: %s: %w", n+1, what, err)
+	}
+	return nil
+}
+
+// Blocks is page n's get_text("blocks").
+func (d *Doc) Blocks(n int) ([]Block, error) {
+	var b []Block
+	err := d.read(n, "blocks", &b, func(out *C.nx_json) { C.nx_blocks(d.ctx, d.doc, C.int(n), out) })
+	return b, err
+}
+
+// RawDict is page n's get_text("rawdict").
+func (d *Doc) RawDict(n int) (TextDict, error) {
+	var t TextDict
+	err := d.read(n, "rawdict", &t, func(out *C.nx_json) { C.nx_rawdict(d.ctx, d.doc, C.int(n), out) })
+	return t, err
+}
+
+// Drawings is page n's get_drawings(extended=extended).
+func (d *Doc) Drawings(n int, extended bool) ([]Path, error) {
+	var p []Path
+	ext := C.int(0)
+	if extended {
+		ext = 1
+	}
+	err := d.read(n, "drawings", &p, func(out *C.nx_json) { C.nx_drawings(d.ctx, d.doc, C.int(n), ext, out) })
+	return p, err
 }
