@@ -3,8 +3,12 @@
 // (page.get_text()), its text in reading order (page.get_text("text",
 // sort=True)), whether it shows an image (page.get_images()), its size
 // (page.rect), the boxes of the images it draws (page.get_image_info()), and
-// the page drawn as PNG (page.get_pixmap(dpi=…).tobytes("png")). A Go
-// service that replaces a Python one gets the same text and the same pixels.
+// the page drawn as PNG (page.get_pixmap(dpi=…).tobytes("png")). It also
+// gives a page's blocks, rawdict, drawings, images and tables
+// (page.find_tables()), and writes PDFs: shapes and text (Page.insert_text,
+// insert_textbox, draw_rect, draw_line), HTML through Story and
+// DocumentWriter, metadata, page subsets. A Go service that replaces a
+// Python one gets the same text and the same pixels.
 //
 // MuPDF is a C library, linked through cgo. Its static build for each
 // platform, with the CJK tables Japanese, Chinese and Korean PDFs need, comes

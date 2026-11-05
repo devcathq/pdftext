@@ -171,13 +171,11 @@ func sameRect(r Rect, want []float64) bool {
 	return len(want) == 4 && r == Rect{float32(want[0]), float32(want[1]), float32(want[2]), float32(want[3])}
 }
 
-// substitutedCJK are test files whose CJK fonts are not embedded. MuPDF
-// draws them with a font of its own, and the one PyMuPDF 1.28.0's wheels
-// pick (they bundle a MuPDF development snapshot, 1.29.0) is not the one
-// released MuPDF 1.28.6 picks: the same text, in another typeface. Their
-// pages are compared by size only. None of 300 real PDFs checked (31 Oct)
-// has such a font.
-var substitutedCJK = map[string]bool{"cjk.pdf": true}
+// substitutedCJK are test files compared by page size only, and without
+// the span fields a substituted font sets. None: MuPDF is built with
+// TOFU_CJK_EXT as PyMuPDF's wheels are, so a CJK font that is not embedded
+// is replaced by the same Droid Sans Fallback in both.
+var substitutedCJK = map[string]bool{}
 
 // sameDrawings draws the page at each recorded DPI and requires PyMuPDF's
 // size and pixels, and its PNG bytes.
