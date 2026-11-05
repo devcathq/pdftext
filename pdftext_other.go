@@ -35,3 +35,18 @@ func (*Doc) RawDict(int) (TextDict, error) { return TextDict{}, ErrUnavailable }
 
 // Drawings returns ErrUnavailable in this build.
 func (*Doc) Drawings(int, bool) ([]Path, error) { return nil, ErrUnavailable }
+
+// Images returns ErrUnavailable in this build.
+func (*Doc) Images(int) ([]ImageRef, error) { return nil, ErrUnavailable }
+
+// Image returns ErrUnavailable in this build.
+func (*Doc) Image(int, bool) (Image, error) { return Image{}, ErrUnavailable }
+
+// ImageRects returns ErrUnavailable in this build.
+func (*Doc) ImageRects(int, int) ([]Rect, error) { return nil, ErrUnavailable }
+
+// XrefLength is 0 in this build.
+func (*Doc) XrefLength() int { return 0 }
+
+// XrefObject returns ErrUnavailable in this build.
+func (*Doc) XrefObject(int) (string, error) { return "", ErrUnavailable }

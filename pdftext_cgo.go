@@ -137,14 +137,7 @@ func (d *Doc) read(n int, what string, v any, run func(out *C.nx_json)) error {
 	}
 	var out C.nx_json
 	run(&out)
-	defer C.nx_free_json(d.ctx, &out)
-	if out.failed != 0 {
-		return fmt.Errorf("pdftext: page %d: %s: %s", n+1, what, C.GoString(&out.err[0]))
-	}
-	if err := json.Unmarshal(C.GoBytes(unsafe.Pointer(out.data), C.int(out.n)), v); err != nil {
-		return fmt.Errorf("pdftext: page %d: %s: %w", n+1, what, err)
-	}
-	return nil
+	return d.decode(&out, fmt.Sprintf("page %d: %s", n+1, what), v)
 }
 
 // Blocks is page n's get_text("blocks").
@@ -170,4 +163,59 @@ func (d *Doc) Drawings(n int, extended bool) ([]Path, error) {
 	}
 	err := d.read(n, "drawings", &p, func(out *C.nx_json) { C.nx_drawings(d.ctx, d.doc, C.int(n), ext, out) })
 	return p, err
+}
+
+// Images is page n's get_images(full=True).
+func (d *Doc) Images(n int) ([]ImageRef, error) {
+	var r []ImageRef
+	err := d.read(n, "images", &r, func(out *C.nx_json) { C.nx_images(d.ctx, d.doc, C.int(n), out) })
+	return r, err
+}
+
+// Image is Pixmap(doc, xref) with its tobytes("png"); with rgb, the
+// pixmap is converted first as Pixmap(csRGB, pix) does (alpha kept).
+func (d *Doc) Image(xref int, rgb bool) (Image, error) {
+	var img Image
+	conv := C.int(0)
+	if rgb {
+		conv = 1
+	}
+	var out C.nx_json
+	C.nx_image(d.ctx, d.doc, C.int(xref), conv, &out)
+	err := d.decode(&out, fmt.Sprintf("image %d", xref), &img)
+	return img, err
+}
+
+// ImageRects is page n's get_image_rects(xref): where the page draws that
+// image, matched by its pixels' digest.
+func (d *Doc) ImageRects(n, xref int) ([]Rect, error) {
+	var r []Rect
+	err := d.read(n, "image rects", &r, func(out *C.nx_json) { C.nx_image_rects(d.ctx, d.doc, C.int(n), C.int(xref), out) })
+	return r, err
+}
+
+// XrefLength is doc.xref_length(): the size of the xref table, so objects
+// are 1 to XrefLength()-1.
+func (d *Doc) XrefLength() int { return int(C.nx_xref_len(d.ctx, d.doc)) }
+
+// XrefObject is doc.xref_object(xref): the object as PDF source; xref -1
+// is the trailer.
+func (d *Doc) XrefObject(xref int) (string, error) {
+	var s string
+	var out C.nx_json
+	C.nx_xref_object(d.ctx, d.doc, C.int(xref), &out)
+	err := d.decode(&out, fmt.Sprintf("xref %d", xref), &s)
+	return s, err
+}
+
+// decode reads what a reader wrote into out, then frees it.
+func (d *Doc) decode(out *C.nx_json, what string, v any) error {
+	defer C.nx_free_json(d.ctx, out)
+	if out.failed != 0 {
+		return fmt.Errorf("pdftext: %s: %s", what, C.GoString(&out.err[0]))
+	}
+	if err := json.Unmarshal(C.GoBytes(unsafe.Pointer(out.data), C.int(out.n)), v); err != nil {
+		return fmt.Errorf("pdftext: %s: %w", what, err)
+	}
+	return nil
 }
