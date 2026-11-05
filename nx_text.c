@@ -125,21 +125,7 @@ void nx_blocks(fz_context *ctx, fz_document *doc, int pno, nx_json *out) {
 static void font_name(fz_context *ctx, fz_font *font, text *t) {
 	const char *name = fz_font_name(ctx, font), *plus = strchr(name, '+');
 	if (plus && plus - name == 6) name = plus + 1;
-	for (const unsigned char *p = (const unsigned char *)name; *p; p++) {
-		int digits = p[0] == '\\' && p[1] == 'u' ? 4 : p[0] == '\\' && p[1] == 'U' ? 8 : 0, v = 0, k = 0;
-		for (; digits && k < digits; k++) {
-			int c = p[2 + k], d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 :
-				c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
-			if (d < 0) break;
-			v = v * 16 + d;
-		}
-		if (digits && k == digits) {
-			nx_put_rune(&t->s, &t->n, &t->cap, v);
-			p += 1 + digits;
-		} else {
-			nx_put_rune(&t->s, &t->n, &t->cap, *p);
-		}
-	}
+	nx_put_raw_escape(&t->s, &t->n, &t->cap, name, strlen(name));
 }
 
 // char_flags is JM_char_font_flags: superscript 1, italic 2, serif 4,

@@ -35,7 +35,13 @@ type golden struct {
 		RawDict     any `json:"rawdict"`
 		Drawings    any `json:"drawings"`
 		DrawingsExt any `json:"drawings_extended"`
+
+		ImagesFull any         `json:"images_full"`
+		Pixmaps    []pixmapRec `json:"pixmaps"`
+		ImageRects [][]any     `json:"image_rects"`
 	} `json:"pages"`
+	XrefLength  int       `json:"xref_length"`
+	XrefObjects []*string `json:"xref_objects"`
 }
 
 // drawn is one page as PyMuPDF drew it: page.get_pixmap(dpi=DPI).
@@ -96,6 +102,7 @@ func comparePDF(t *testing.T, path string, g golden) int {
 		t.Errorf("%s: %d pages, PyMuPDF %d", g.File, doc.Pages(), len(g.Pages))
 		return 0
 	}
+	sameXrefs(t, doc, g)
 	same := 0
 	for i, want := range g.Pages {
 		p, err := doc.Page(i)
@@ -123,6 +130,8 @@ func comparePDF(t *testing.T, path string, g golden) int {
 			t.Errorf("%s page %d: drawn differently", g.File, i+1)
 		case !sameStructure(t, doc, g.File, i, want.Blocks, want.RawDict, want.Drawings, want.DrawingsExt):
 			t.Errorf("%s page %d: blocks, rawdict or drawings differ", g.File, i+1)
+		case !sameImages(t, doc, g.File, i, want.ImagesFull, want.Pixmaps, want.ImageRects):
+			t.Errorf("%s page %d: images differ", g.File, i+1)
 		default:
 			same++
 		}
@@ -240,8 +249,14 @@ func sameStructure(t *testing.T, doc *Doc, file string, n int, blocks, raw, draw
 		b, err := doc.Blocks(n)
 		return blocksShape(b), err
 	})
+	if substitutedCJK[file] && raw != nil {
+		raw = withoutFontStyle(raw)
+	}
 	ok = check("rawdict", raw, func() (any, error) {
 		r, err := doc.RawDict(n)
+		if substitutedCJK[file] {
+			return withoutFontStyle(rawdictShape(r)), err
+		}
 		return rawdictShape(r), err
 	}) && ok
 	ok = check("drawings", drawings, func() (any, error) {
@@ -252,4 +267,121 @@ func sameStructure(t *testing.T, doc *Doc, file string, n int, blocks, raw, draw
 		p, err := doc.Drawings(n, true)
 		return drawingsShape(p, true), err
 	}) && ok
+}
+
+// withoutFontStyle drops what a span takes from its font (name, flags,
+// ascender, descender), for the pages of substitutedCJK, whose font MuPDF
+// substitutes differently from PyMuPDF's wheels.
+func withoutFontStyle(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := map[string]any{}
+		for k, e := range x {
+			if _, span := x["chars"]; span && (k == "font" || k == "flags" || k == "ascender" || k == "descender") {
+				continue
+			}
+			out[k] = withoutFontStyle(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = withoutFontStyle(e)
+		}
+		return out
+	}
+	return v
+}
+
+// pixmapRec is Pixmap(doc, xref) as PyMuPDF made it (pymupdf_golden.py).
+type pixmapRec struct {
+	Xref       int    `json:"xref"`
+	RGB        bool   `json:"rgb"`
+	Error      string `json:"error"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	N          int    `json:"n"`
+	Alpha      bool   `json:"alpha"`
+	ColorSpace string `json:"colorspace"`
+	Digest     string `json:"digest"`
+	PNG        string `json:"png"`
+	PNGError   string `json:"png_error"`
+}
+
+// sameImages compares get_images(full=True), each image's pixmap and PNG,
+// and get_image_rects; those a golden did not record pass.
+func sameImages(t *testing.T, doc *Doc, file string, n int, full any, pixmaps []pixmapRec, rects [][]any) bool {
+	if full == nil {
+		return true
+	}
+	refs, err := doc.Images(n)
+	if err != nil {
+		t.Logf("%s page %d: images: %v", file, n+1, err)
+		return false
+	}
+	shape := []any{}
+	for _, r := range refs {
+		shape = append(shape, []any{r.Xref, r.SMask, r.Width, r.Height, r.BPC, r.ColorSpace, r.AltColorSpace, r.Name, r.Filter, r.Referencer})
+	}
+	if ok, diff := sameShape(shape, full); !ok {
+		t.Logf("%s page %d: images differ at %s", file, n+1, diff)
+		return false
+	}
+	for _, want := range pixmaps {
+		img, err := doc.Image(want.Xref, want.RGB)
+		if (err != nil) != (want.Error != "") {
+			t.Logf("%s page %d: image %d (rgb %v): Go error %v, PyMuPDF %q", file, n+1, want.Xref, want.RGB, err, want.Error)
+			return false
+		}
+		if err != nil {
+			continue
+		}
+		png := ""
+		if img.PNG != nil {
+			png = digest(img.PNG)
+		}
+		got := pixmapRec{Xref: want.Xref, RGB: want.RGB, Width: img.Width, Height: img.Height, N: img.N, Alpha: img.Alpha,
+			ColorSpace: img.ColorSpace, Digest: img.Digest, PNG: png, PNGError: img.PNGError}
+		if got != want {
+			t.Logf("%s page %d: image %d (rgb %v): Go %+v, PyMuPDF %+v", file, n+1, want.Xref, want.RGB, got, want)
+			return false
+		}
+	}
+	for _, xr := range rects {
+		xref := int(xr[0].(float64))
+		got, err := doc.ImageRects(n, xref)
+		if err != nil {
+			t.Logf("%s page %d: image rects %d: %v", file, n+1, xref, err)
+			return false
+		}
+		shape := []any{}
+		for _, r := range got {
+			shape = append(shape, rectShape(r))
+		}
+		if ok, diff := sameShape(shape, xr[1]); !ok {
+			t.Logf("%s page %d: image rects %d differ at %s", file, n+1, xref, diff)
+			return false
+		}
+	}
+	return true
+}
+
+// sameXrefs compares xref_length() and every xref_object() of the file.
+func sameXrefs(t *testing.T, doc *Doc, g golden) {
+	if g.XrefObjects == nil {
+		return
+	}
+	if doc.XrefLength() != g.XrefLength {
+		t.Errorf("%s: xref length %d, PyMuPDF %d", g.File, doc.XrefLength(), g.XrefLength)
+		return
+	}
+	for i, want := range g.XrefObjects {
+		got, err := doc.XrefObject(i + 1)
+		switch {
+		case want == nil && err == nil:
+			t.Errorf("%s: xref %d: Go %q, PyMuPDF raised", g.File, i+1, got)
+		case want != nil && (err != nil || got != *want):
+			t.Errorf("%s: xref %d: Go %q (%v), PyMuPDF %q", g.File, i+1, short(got), err, short(*want))
+		}
+	}
 }

@@ -63,12 +63,18 @@ void nx_free_json(fz_context *ctx, nx_json *j);
 void nx_blocks(fz_context *ctx, fz_document *doc, int pno, nx_json *out);
 void nx_rawdict(fz_context *ctx, fz_document *doc, int pno, nx_json *out);
 void nx_drawings(fz_context *ctx, fz_document *doc, int pno, int extended, nx_json *out);
+void nx_images(fz_context *ctx, fz_document *doc, int pno, nx_json *out);
+void nx_image(fz_context *ctx, fz_document *doc, int xref, int rgb, nx_json *out);
+void nx_image_rects(fz_context *ctx, fz_document *doc, int pno, int xref, nx_json *out);
+int nx_xref_len(fz_context *ctx, fz_document *doc);
+void nx_xref_object(fz_context *ctx, fz_document *doc, int xref, nx_json *out);
 
 // Shared by the readers (nx.c, nx_json.c).
 fz_stext_page *nx_textpage(fz_context *ctx, fz_document *doc, int pno, int flags);
 fz_rect nx_char_bbox(fz_context *ctx, fz_stext_line *line, fz_stext_char *ch);
 int nx_overlap(fz_rect a, fz_rect b);
 void nx_put_rune(char **buf, int *n, int *cap, int c);
+void nx_put_raw_escape(char **buf, int *n, int *cap, const char *s, size_t len);
 void nx_j_raw(fz_context *ctx, fz_buffer *b, const char *s);
 void nx_j_str(fz_context *ctx, fz_buffer *b, const char *s, size_t n);
 void nx_j_num(fz_context *ctx, fz_buffer *b, float f);

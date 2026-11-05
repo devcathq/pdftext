@@ -18,7 +18,10 @@ Usage: python scripts/make_testdata.py testdata
   (for Drawings);
 - tables.pdf: ruled tables with a header row, an empty cell, a merged cell
   and a cell of two lines, beside running text (for Blocks, RawDict and the
-  table finder).
+  table finder);
+- image_kinds.pdf: an RGB image with an alpha mask, a CMYK JPEG, a grey
+  image, a logo placed twice and an image inside a Form XObject (for
+  Images, Image and ImageRects).
 """
 import os
 import sys
@@ -233,10 +236,41 @@ def tables(c):
     c.showPage()
 
 
+def image_kinds(c):
+    import io
+    w, h = A4
+    rgba = Image.new("RGBA", (120, 80), (0, 0, 0, 0))
+    d = ImageDraw.Draw(rgba)
+    d.ellipse([10, 10, 110, 70], fill=(200, 30, 30, 255))
+    d.rectangle([40, 30, 80, 50], fill=(30, 30, 200, 128))
+    c.drawImage(ImageReader(rgba), 60, h - 160, 120, 80, mask="auto")
+    cmyk = Image.new("CMYK", (90, 60), (0, 128, 255, 0))
+    ImageDraw.Draw(cmyk).rectangle([10, 10, 80, 50], fill=(255, 0, 0, 64))
+    buf = io.BytesIO()
+    cmyk.save(buf, "JPEG", quality=90)
+    buf.seek(0)
+    c.drawImage(ImageReader(buf), 220, h - 160, 90, 60)
+    c.drawImage(picture(100, 100, "L", ["GREY"]), 340, h - 160, 100, 100)
+    logo = picture(160, 80, "RGB", ["LOGO"])
+    c.drawImage(logo, 60, h - 320, 80, 40)
+    c.drawImage(logo, 300, h - 320, 160, 80)
+    c.beginForm("stamp")
+    c.drawImage(picture(80, 80, "RGB", ["FORM"]), 0, 0, 80, 80)
+    c.endForm()
+    c.saveState()
+    c.translate(60, 300)
+    c.doForm("stamp")
+    c.restoreState()
+    c.setFont("Helvetica", 10)
+    c.drawString(60, 280, "Images of several kinds.")
+    c.showPage()
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     for name, fill in [("columns", columns), ("rotated", rotated), ("cjk", cjk), ("many_pages", many_pages),
-                       ("images", images), ("drawings", drawings), ("tables", tables)]:
+                       ("images", images), ("drawings", drawings), ("tables", tables),
+                       ("image_kinds", image_kinds)]:
         c = canvas.Canvas(os.path.join(out, name + ".pdf"), pagesize=A4, invariant=1)
         fill(c)
         c.save()

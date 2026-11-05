@@ -94,6 +94,29 @@ void nx_j_bytes(fz_context *ctx, fz_buffer *b, const unsigned char *d, size_t n)
 	fz_append_byte(ctx, b, '"');
 }
 
+// nx_put_raw_escape is bytes read back as Python's raw-unicode-escape
+// (JM_EscapeStrFromStr, JM_EscapeStrFromBuffer): each byte its Latin-1
+// character, but \uXXXX and \UXXXXXXXX are the characters they name.
+void nx_put_raw_escape(char **buf, int *n, int *cap, const char *s, size_t len) {
+	const unsigned char *p = (const unsigned char *)s, *end = p + len;
+	for (; p < end; p++) {
+		int digits = p + 1 < end && p[0] == '\\' ? (p[1] == 'u' ? 4 : p[1] == 'U' ? 8 : 0) : 0, k = 0;
+		long v = 0;
+		for (; digits && k < digits && p + 2 + k < end; k++) {
+			int c = p[2 + k], d = c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 :
+				c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
+			if (d < 0) break;
+			v = v * 16 + d;
+		}
+		if (digits && k == digits) {
+			nx_put_rune(buf, n, cap, v > 0x10ffff ? 0xfffd : (int)v);
+			p += 1 + digits;
+		} else {
+			nx_put_rune(buf, n, cap, *p);
+		}
+	}
+}
+
 // nx_json_done hands the buffer to out; nx_json_fail drops it and records
 // MuPDF's message. Both are called after the reader's fz_try.
 void nx_json_done(fz_context *ctx, fz_buffer *b, nx_json *out) {
