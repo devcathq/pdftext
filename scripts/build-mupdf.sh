@@ -24,7 +24,11 @@ MAKE_FLAGS="build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no"
 # No fused multiply-add: arm64 compilers fuse a*b+c by default, which rounds
 # differently from x86 and moves pixels of a drawn page. Baseline x86-64 has
 # no FMA, so this changes nothing there and makes arm64 draw the same.
-FP_FLAGS="-ffp-contract=off"
+# TOFU_CJK_EXT as PyMuPDF's wheels build MuPDF (its setup.py): without the
+# large Source Han fonts, so every CJK text MuPDF has to draw with a font of
+# its own (a CJK font not embedded, Story, insert_text with "japan") uses
+# Droid Sans Fallback, as in PyMuPDF. The CJK tables stay.
+FP_FLAGS="-ffp-contract=off -DTOFU_CJK_EXT"
 
 target="${1:?usage: build-mupdf.sh <goos_goarch>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
